@@ -196,6 +196,27 @@ def handle_put_ticket(seat_id: str, raw_body: str | None, table=None) -> dict:
 
 def lambda_handler(event: dict, context=None, table=None) -> dict:
     """API Gateway (HTTP API v2 / REST API v1) からのイベントを処理するメインハンドラー。"""
+    # AWSコンソールの「Test」ボタンから {"action": "seed"} を渡された場合、B001〜B400 を一括初期化する
+    if isinstance(event, dict) and event.get("action") == "seed":
+        target_table = table if table is not None else get_table()
+        with target_table.batch_writer() as batch:
+            for i in range(1, 401):
+                batch.put_item(
+                    Item={
+                        "seat_id": f"B{i:03d}",
+                        "status": "UNCHECKED",
+                        "updated_at": None,
+                        "updated_by": None,
+                    }
+                )
+        return build_response(
+            200,
+            {
+                "message": "B001〜B400 (計400席) の初期データ投入・UNCHECKED初期化が完了しました。",
+                "count": 400,
+            },
+        )
+
     # HTTPメソッドの取得 (HTTP API v2 と REST API v1 両対応)
     http_method = (
         event.get("requestContext", {}).get("http", {}).get("method")

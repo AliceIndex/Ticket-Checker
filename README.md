@@ -59,6 +59,11 @@ python backend/seed_data.py --table-name StudentTicketChecks --region ap-northea
 python backend/seed_data.py --ranges B:1-400 --region ap-northeast-1
 ```
 
-### 3. フロントエンドの API URL 設定
-* `app.js` 内の `window.TICKET_API_BASE_URL`、またはアクセスURLのクエリパラメータ（`https://<ユーザー名>.github.io/<リポジトリ名>/?api=https://xxxx.execute-api...`）、あるいは画面下部の「接続設定」からAPIエンドポイントを指定できます。
+### 3. フロントエンドの API URL 設定（GitHub Actions + Secrets 併用）
+1. GitHub リポジトリ（`AliceIndex/Ticket-Checker`）の **Settings > Pages** を開き、**Build and deployment > Source** を **`GitHub Actions`** に変更します。
+2. **Settings > Secrets and variables > Actions** を開き、**New repository secret** をクリックします。
+   * **Name**: `API_BASE_URL`
+   * **Secret**: API Gateway のデフォルトエンドポイントURL（例: `https://xxxx.execute-api.ap-northeast-1.amazonaws.com`）
+3. `main` ブランチへのプッシュ時（または **Actions** タブから `Deploy to GitHub Pages` の **Run workflow** 手動実行時）に、自動で `config.js` に API URL が注入されてデプロイされます。
+   * ※さらに、アクセスURLのクエリパラメータ（`?api=https://...`）や画面下部の「接続設定」からも上書き指定が可能です。
 

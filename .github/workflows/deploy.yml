@@ -1,0 +1,48 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# GitHub Pages デプロイ用権限設定
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同時デプロイの競合防止
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate config.js from GitHub Secrets
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+        run: |
+          mkdir -p _site
+          cp index.html style.css app.js _site/
+          printf 'window.TICKET_API_BASE_URL = "%s";\n' "${API_BASE_URL}" > _site/config.js
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "_site"
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
