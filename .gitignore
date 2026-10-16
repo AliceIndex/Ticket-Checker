@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+
+# ローカル仕様書・計画書ドキュメント（公開リポジトリ除外）
+仕様書.md
+仕様書.pdf
+実装計画書.md

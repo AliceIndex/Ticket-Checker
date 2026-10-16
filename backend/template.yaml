@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  学祭ライブ 学生証確認サービス バックエンドインフラ (DynamoDB + Lambda + HTTP API Gateway)
+
+Parameters:
+  AllowedOrigin:
+    Type: String
+    Default: "*"
+    Description: "CORSで許可するオリジン (本番環境では GitHub Pages の URL 例: https://your-org.github.io を指定)"
+  TableName:
+    Type: String
+    Default: "StudentTicketChecks"
+    Description: "DynamoDB テーブル名"
+
+Globals:
+  Function:
+    Timeout: 10
+    MemorySize: 128
+    Runtime: python3.12
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref TableName
+        ALLOWED_ORIGIN: !Ref AllowedOrigin
+
+Resources:
+  # ------------------------------------------------------------
+  # T1-1: DynamoDB テーブル (オンデマンドキャパシティ)
+  # ------------------------------------------------------------
+  StudentTicketChecksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: seat_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: seat_id
+          KeyType: HASH
+
+  # ------------------------------------------------------------
+  # T1-4: Amazon API Gateway (HTTP API) & CORS 設定
+  # ------------------------------------------------------------
+  TicketHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedOrigin
+        AllowMethods:
+          - GET
+          - PUT
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Accept
+
+  # ------------------------------------------------------------
+  # T1-3: Lambda 関数 (TicketServiceHandler)
+  # ------------------------------------------------------------
+  TicketServiceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TicketServiceHandler
+      CodeUri: ./
+      Handler: lambda_function.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref StudentTicketChecksTable
+      Events:
+        GetTicket:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TicketHttpApi
+            Path: /tickets/{seat_id}
+            Method: GET
+        PutTicket:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TicketHttpApi
+            Path: /tickets/{seat_id}
+            Method: PUT
+
+Outputs:
+  ApiEndpoint:
+    Description: "HTTP API Gateway エンドポイントURL"
+    Value: !Sub "https://${TicketHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  DynamoDBTableName:
+    Description: "DynamoDB テーブル名"
+    Value: !Ref StudentTicketChecksTable
+
