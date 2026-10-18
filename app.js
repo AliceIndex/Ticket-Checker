@@ -4,9 +4,9 @@
  * 要件・仕様対応:
  * - T2-2: 担当者名は JavaScript メモリ変数 (operatorName) にのみ保持。
  *         localStorage / sessionStorage / Cookie 等には一切保存せず、リロード・再起動で確実にリセット。
- * - T2-3: 座席番号の自動大文字変換、全角→半角自動正規化、正規表現チェック (^[A-Z][0-9]{3}$)、
- *         1文字目入力後のテンキー (inputmode="numeric") 動的切替 & ブロック選択ボタン対応。
- * - T2-4: 4桁入力完了時の自動 GET /tickets/{seat_id} 照会、ステータス別表示切替、PUT 更新/取消。
+ * - T2-3: 座席番号はオンスクリーンキーボード（ブロック選択ボタン＋0〜9テンキー）で入力。
+ *         デフォルトでブロック「B」を選択状態とし、数字3桁入力完了でキーボードを非表示にして照会画面を表示。
+ * - T2-4: 3桁の数字入力完了時の自動 GET /tickets/{seat_id} 照会、ステータス別表示切替、PUT 更新/取消。
  * - T2-5: 5秒タイムアウト、自動1回リトライ、通信中スピナーによる多重タップ抑止、再試行ボタン。
  */
 
@@ -23,7 +23,7 @@
   /**
    * 本番デプロイ時はここに API Gateway のエンドポイントURLを設定するか、
    * URLクエリ (?api=https://...) で指定可能。
-   * 空文字列の場合はブラウザ内のインメモリ・モックDB (A001〜A200, B001〜B200) で動作。
+   * 空文字列の場合はブラウザ内のインメモリ・モックDB (B001〜B400) で動作。
    */
   const urlParams = new URLSearchParams(window.location.search);
   let apiBaseUrl = (urlParams.get("api") || window.TICKET_API_BASE_URL || "").replace(/\/+$/, "");
@@ -32,6 +32,8 @@
   // 揮発性ステート (T2-2: ストレージ保存厳禁・メモリ内のみ保持)
   // ============================================================
   let operatorName = ""; // 担当者名（リロードで必ず消える）
+  let selectedBlock = "B"; // 選択中のブロック文字（デフォルト: B）
+  let inputDigits = ""; // テンキーで入力中の数字（0〜3桁）
   let currentSeatId = ""; // 現在照会・操作中の座席番号
   let isRequestInFlight = false; // 多重リクエスト防止フラグ
   let lastFailedAction = null; // 通信エラー時の再試行用クロージャ
@@ -76,10 +78,12 @@
     saveConfigBtn: document.getElementById("save-config-btn"),
     closeConfigBtn: document.getElementById("close-config-btn"),
 
+    keyboardSection: document.getElementById("keyboard-section"),
     seatInput: document.getElementById("seat-input"),
-    clearSeatBtn: document.getElementById("clear-seat-btn"),
-    manualSearchBtn: document.getElementById("manual-search-btn"),
+    seatPrefixDisplay: document.getElementById("seat-prefix-display"),
+    seatDigitsDisplay: document.getElementById("seat-digits-display"),
     blockBtns: document.querySelectorAll(".block-btn"),
+    numpadBtns: document.querySelectorAll(".numpad-btn"),
 
     statusSection: document.getElementById("status-section"),
     viewIdle: document.getElementById("view-idle"),
@@ -108,16 +112,6 @@
   // ============================================================
   // ユーティリティ関数
   // ============================================================
-
-  /**
-   * 全角英数字を半角に変換し、英小文字を大文字に変換、空白を除去する (T2-3)
-   */
-  function normalizeInputString(raw) {
-    return raw
-      .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0))
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "");
-  }
 
   /**
    * ISO8601 日時文字列を見やすい時刻形式 (HH:MM:SS) にフォーマットする
@@ -150,23 +144,33 @@
   }
 
   /**
-   * 入力文字数に応じてスマートフォンのキーボードモードを最適化する (T2-3)
-   * - 0文字目: 英字入力 (text)
-   * - 1〜3文字目 (先頭が英字の場合): 数字テンキー (numeric)
+   * 座席番号ディスプレイとブロック選択ボタンの表示を同期する (T2-3)
    */
-  function updateInputModeForSeat() {
-    const val = dom.seatInput.value;
-    if (val.length >= 1 && /^[A-Z]/.test(val)) {
-      dom.seatInput.setAttribute("inputmode", "numeric");
-    } else {
-      dom.seatInput.setAttribute("inputmode", "text");
-    }
+  function updateSeatDisplay() {
+    dom.seatPrefixDisplay.textContent = selectedBlock;
+    const paddedDigits = inputDigits.padEnd(3, "_");
+    dom.seatDigitsDisplay.textContent = paddedDigits;
+    dom.seatDigitsDisplay.classList.toggle("is-placeholder", inputDigits.length === 0);
 
-    // ブロックボタンのアクティブ表示同期
-    const firstChar = val.charAt(0);
     dom.blockBtns.forEach((btn) => {
-      btn.classList.toggle("is-active", btn.dataset.prefix === firstChar);
+      btn.classList.toggle("is-active", btn.dataset.prefix === selectedBlock);
     });
+  }
+
+  /**
+   * オンスクリーンキーボード画面を表示し、照会画面を非表示にする
+   */
+  function showKeyboardSection() {
+    dom.keyboardSection.hidden = false;
+    dom.statusSection.hidden = true;
+  }
+
+  /**
+   * オンスクリーンキーボードを非表示にし、照会画面を表示する
+   */
+  function showStatusSection() {
+    dom.keyboardSection.hidden = true;
+    dom.statusSection.hidden = false;
   }
 
   /**
@@ -341,7 +345,7 @@
   }
 
   /**
-   * 座席番号の照会を実行する
+   * 座席番号の照会を実行する（キーボードを非表示にし照会画面を表示）
    */
   async function lookupSeat(seatId) {
     if (isRequestInFlight) return;
@@ -349,6 +353,8 @@
       openOperatorModal();
       return;
     }
+
+    showStatusSection();
 
     if (!SEAT_REGEX.test(seatId)) {
       switchStatusView("invalid", "state-danger");
@@ -429,15 +435,35 @@
   }
 
   /**
-   * 入力欄をクリアして次の座席入力へ備える
+   * 数字入力をリセットし、オンスクリーンキーボードを再表示して次の座席入力へ備える
+   * （選択中のブロック文字 selectedBlock は維持される）
    */
-  function resetSeatInput(focusInput = true) {
-    dom.seatInput.value = "";
+  function resetSeatInput() {
+    inputDigits = "";
     currentSeatId = "";
-    updateInputModeForSeat();
+    updateSeatDisplay();
     switchStatusView("idle", "state-idle");
-    if (focusInput) {
-      dom.seatInput.focus();
+    showKeyboardSection();
+  }
+
+  /**
+   * テンキーの数字ボタン（0〜9）押下時の処理
+   * 3桁入力が完了したらキーボードを非表示にして照会画面を表示する
+   */
+  function handleDigitInput(digit) {
+    if (isRequestInFlight) return;
+    if (!operatorName) {
+      openOperatorModal();
+      return;
+    }
+    if (inputDigits.length >= 3) return;
+
+    inputDigits += digit;
+    updateSeatDisplay();
+
+    if (inputDigits.length === 3) {
+      const seatId = `${selectedBlock}${inputDigits}`;
+      lookupSeat(seatId);
     }
   }
 
@@ -472,7 +498,6 @@
     dom.appContainer.setAttribute("aria-hidden", "false");
 
     showToast(`担当者「${operatorName}」で受付を開始しました`, "success", 2200);
-    dom.seatInput.focus();
   }
 
   // ============================================================
@@ -483,68 +508,28 @@
   dom.operatorForm.addEventListener("submit", handleOperatorSubmit);
   dom.changeOperatorBtn.addEventListener("click", openOperatorModal);
 
-  // ブロック選択クイックボタン (A / B / C / D)
+  // ブロック選択ボタン (A / B / C / D)
   dom.blockBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
-      const prefix = btn.dataset.prefix;
-      const currentDigits = dom.seatInput.value.replace(/^[A-Z]/, "").slice(0, 3);
-      dom.seatInput.value = prefix + currentDigits;
-      updateInputModeForSeat();
-      dom.seatInput.focus();
+      if (isRequestInFlight) return;
+      selectedBlock = btn.dataset.prefix;
+      updateSeatDisplay();
+    });
+  });
 
-      if (dom.seatInput.value.length === 4) {
-        lookupSeat(dom.seatInput.value);
+  // オンスクリーンテンキー (0〜9)
+  dom.numpadBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const digit = btn.dataset.digit;
+      if (digit !== undefined) {
+        handleDigitInput(digit);
       }
     });
   });
 
-  // 座席番号入力イベント（自動大文字変換 & 4桁到達時自動照会）
-  dom.seatInput.addEventListener("input", () => {
-    const normalized = normalizeInputString(dom.seatInput.value).slice(0, 4);
-    if (dom.seatInput.value !== normalized) {
-      dom.seatInput.value = normalized;
-    }
-    updateInputModeForSeat();
-
-    if (normalized.length === 0) {
-      switchStatusView("idle", "state-idle");
-      return;
-    }
-
-    if (normalized.length === 4) {
-      if (SEAT_REGEX.test(normalized)) {
-        // スマホのソフトキーボードを閉じすぎず即座に照会
-        lookupSeat(normalized);
-      } else {
-        switchStatusView("invalid", "state-danger");
-      }
-    }
-  });
-
-  // Enterキー押下時の照会
-  dom.seatInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const val = normalizeInputString(dom.seatInput.value);
-      if (!val) return;
-      lookupSeat(val);
-    }
-  });
-
-  // 手動照会ボタン
-  dom.manualSearchBtn.addEventListener("click", () => {
-    const val = normalizeInputString(dom.seatInput.value);
-    if (!val) {
-      dom.seatInput.focus();
-      return;
-    }
-    lookupSeat(val);
-  });
-
-  // クリアボタン & 「次の座席を入力する」ボタン
-  dom.clearSeatBtn.addEventListener("click", () => resetSeatInput(true));
+  // 「次の座席を入力する」ボタン（キーボード画面へ復帰）
   dom.nextSeatBtns.forEach((btn) => {
-    btn.addEventListener("click", () => resetSeatInput(true));
+    btn.addEventListener("click", () => resetSeatInput());
   });
 
   // アクションボタン: 確認済みにする / 取消する / 再試行
@@ -583,7 +568,8 @@
 
   // 初期起動処理
   updateModeBanner();
-  updateInputModeForSeat();
+  updateSeatDisplay();
+  showKeyboardSection();
   openOperatorModal();
 })();
 
