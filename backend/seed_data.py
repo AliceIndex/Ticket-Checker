@@ -4,7 +4,7 @@
 初期データ投入・全件初期化スクリプト (T1-2 & T5-3)
 
 使い方:
-  # デフォルト設定 (A001〜A200, B001〜B200 の計400席) を DynamoDB に投入/リセット
+  # デフォルト設定 (A001〜A400, B001〜B400 の計800席) を DynamoDB に投入/リセット
   python backend/seed_data.py
 
   # ドライラン（DynamoDBへは書き込まず、生成される座席リストを確認）
@@ -100,8 +100,8 @@ def main():
     parser.add_argument(
         "--ranges",
         nargs="+",
-        default=["B:1-400"],
-        help="生成する座席範囲のリスト (デフォルト: B:1-400 計400席)",
+        default=["A:1-400", "B:1-400"],
+        help="生成する座席範囲のリスト (デフォルト: A:1-400 B:1-400 計800席)",
     )
     parser.add_argument(
         "--dry-run",

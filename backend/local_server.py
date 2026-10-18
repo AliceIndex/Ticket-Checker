@@ -120,7 +120,7 @@ def main():
     parser.add_argument("--port", type=int, default=8000, help="待受ポート番号 (デフォルト: 8000)")
     args = parser.parse_args()
 
-    records = generate_initial_records(["B:1-400"])
+    records = generate_initial_records(["A:1-400", "B:1-400"])
     mock_table = InMemoryDynamoTable(records)
     root_dir = Path(__file__).resolve().parent.parent
 

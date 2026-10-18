@@ -27,8 +27,8 @@ from seed_data import generate_initial_records
 
 class TestTicketServiceBackend(unittest.TestCase):
     def setUp(self):
-        # 初期データ 400件 (B001〜B400) を投入
-        records = generate_initial_records(["B:1-400"])
+        # 初期データ 800件 (A001〜A400, B001〜B400) を投入
+        records = generate_initial_records(["A:1-400", "B:1-400"])
         self.table = InMemoryDynamoTable(records)
 
     def _invoke(self, method: str, seat_id: str, body: dict | None = None) -> tuple[int, dict]:
@@ -41,14 +41,15 @@ class TestTicketServiceBackend(unittest.TestCase):
         return res["statusCode"], json.loads(res["body"])
 
     def test_initial_seed_count(self):
-        """T1-2: 初期データ400件 (B001〜B400) が正しくUNCHECKEDで生成されているか"""
-        self.assertEqual(len(self.table.store), 400)
-        status, data = self._invoke("GET", "B001")
-        self.assertEqual(status, 200)
-        self.assertEqual(data["seat_id"], "B001")
-        self.assertEqual(data["status"], "UNCHECKED")
-        self.assertIsNone(data["updated_at"])
-        self.assertIsNone(data["updated_by"])
+        """T1-2: 初期データ800件 (A001〜A400, B001〜B400) が正しくUNCHECKEDで生成されているか"""
+        self.assertEqual(len(self.table.store), 800)
+        for seat_id in ["A001", "A400", "B001", "B400"]:
+            status, data = self._invoke("GET", seat_id)
+            self.assertEqual(status, 200)
+            self.assertEqual(data["seat_id"], seat_id)
+            self.assertEqual(data["status"], "UNCHECKED")
+            self.assertIsNone(data["updated_at"])
+            self.assertIsNone(data["updated_by"])
 
     def test_check_in_and_recovery_flow(self):
         """T3-1 & T3-2: CHECKED登録 -> 再照会(二重登録確認) -> UNCHECKED取消の一連フロー"""
@@ -82,8 +83,8 @@ class TestTicketServiceBackend(unittest.TestCase):
         self.assertEqual(data["updated_by"], "鈴木")
 
     def test_out_of_range_seat_returns_404(self):
-        """T3-3: 対象外の座席番号 (Z999, A001, B401, C001) のGET/PUTで404が返るか"""
-        for invalid_seat in ["Z999", "A001", "B401", "B999", "C001"]:
+        """T3-3: 対象外の座席番号 (Z999, A401, B401, C001, D001) のGET/PUTで404が返るか"""
+        for invalid_seat in ["Z999", "A401", "A999", "B401", "B999", "C001", "D001"]:
             status, data = self._invoke("GET", invalid_seat)
             self.assertEqual(status, 404, f"{invalid_seat} should be 404 on GET")
             self.assertEqual(data["error"], "SEAT_NOT_FOUND")

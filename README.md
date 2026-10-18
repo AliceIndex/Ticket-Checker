@@ -15,7 +15,7 @@
 └── backend/                 # AWS バックエンド & 検証ツール一式
     ├── template.yaml        # AWS SAM テンプレート (DynamoDB + Lambda + HTTP API Gateway)
     ├── lambda_function.py   # AWS Lambda ハンドラー (GET / PUT /tickets/{seat_id})
-    ├── seed_data.py         # DynamoDB 初期データ400件(B001〜B400)投入・リセットスクリプト
+    ├── seed_data.py         # DynamoDB 初期データ800件(A001〜A400, B001〜B400)投入・リセットスクリプト
     ├── local_server.py      # ローカルE2E結合テスト用サーバー (AWS不要で動作確認可能)
     └── test_backend.py      # バックエンド自動テストスイート (Phase 3 検証項目)
 ```
@@ -34,8 +34,8 @@ AWS環境にデプロイする前でも、ローカルサーバーを起動し�
 ```powershell
 python backend/local_server.py --port 8000
 ```
-ブラウザで `http://localhost:8000/?api=http://localhost:8000` を開くと、ローカルの `lambda_function.py` とインメモリDB（`B001`〜`B400` の400席）に接続された状態で動作します。
-また、`index.html` をそのまま開いた場合（API未設定時）でも、フロントエンド内蔵のモックモード（`B001`〜`B400`）で即座にUI操作性を確認できます。
+ブラウザで `http://localhost:8000/?api=http://localhost:8000` を開くと、ローカルの `lambda_function.py` とインメモリDB（`A001`〜`A400`, `B001`〜`B400` の計800席）に接続された状態で動作します。
+また、`index.html` をそのまま開いた場合（API未設定時）でも、フロントエンド内蔵のモックモード（`A001`〜`A400`, `B001`〜`B400`）で即座にUI操作性を確認できます。
 
 ---
 
@@ -50,13 +50,13 @@ sam deploy --guided
 * パラメータ `AllowedOrigin` には GitHub Pages のオリジン（例: `https://aliceindex.github.io`、検証中は `*`）を指定します。
 * デプロイ完了時に出力される `ApiEndpoint`（例: `https://xxxx.execute-api.ap-northeast-1.amazonaws.com`）を控えます。
 
-### 2. 対象座席（400件: B001〜B400）の初期データ投入・当日直前リセット
+### 2. 対象座席（800件: A001〜A400, B001〜B400）の初期データ投入・当日直前リセット
 ```powershell
-# デフォルト (B001〜B400 の計400席) を UNCHECKED で一括登録
+# デフォルト (A001〜A400, B001〜B400 の計800席) を UNCHECKED で一括登録
 python backend/seed_data.py --table-name StudentTicketChecks --region ap-northeast-1
 
-# 座席範囲をカスタマイズする場合
-python backend/seed_data.py --ranges B:1-400 --region ap-northeast-1
+# 座席範囲をカスタマイズする場合 (例)
+python backend/seed_data.py --ranges A:1-400 B:1-400 --region ap-northeast-1
 ```
 
 ### 3. フロントエンドの API URL 設定（GitHub Actions + Secrets 併用）

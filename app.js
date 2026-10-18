@@ -5,7 +5,7 @@
  * - T2-2: 担当者名は JavaScript メモリ変数 (operatorName) にのみ保持。
  *         localStorage / sessionStorage / Cookie 等には一切保存せず、リロード・再起動で確実にリセット。
  * - T2-3: 座席番号はオンスクリーンキーボード（ブロック選択ボタン＋0〜9テンキー）で入力。
- *         デフォルトでブロック「B」を選択状態とし、数字3桁入力完了でキーボードを非表示にして照会画面を表示。
+ *         ブロック選択（A / B / C）＋数字3桁入力完了でキーボードを非表示にして照会画面を表示。
  * - T2-4: 3桁の数字入力完了時の自動 GET /tickets/{seat_id} 照会、ステータス別表示切替、PUT 更新/取消。
  * - T2-5: 5秒タイムアウト、自動1回リトライ、通信中スピナーによる多重タップ抑止、再試行ボタン。
  */
@@ -23,7 +23,7 @@
   /**
    * 本番デプロイ時はここに API Gateway のエンドポイントURLを設定するか、
    * URLクエリ (?api=https://...) で指定可能。
-   * 空文字列の場合はブラウザ内のインメモリ・モックDB (B001〜B400) で動作。
+   * 空文字列の場合はブラウザ内のインメモリ・モックDB (A001〜A400, B001〜B400) で動作。
    */
   const urlParams = new URLSearchParams(window.location.search);
   let apiBaseUrl = (urlParams.get("api") || window.TICKET_API_BASE_URL || "").replace(/\/+$/, "");
@@ -32,27 +32,30 @@
   // 揮発性ステート (T2-2: ストレージ保存厳禁・メモリ内のみ保持)
   // ============================================================
   let operatorName = ""; // 担当者名（リロードで必ず消える）
-  let selectedBlock = "B"; // 選択中のブロック文字（デフォルト: B）
+  let selectedBlock = "A"; // 選択中のブロック文字（デフォルト: A）
   let inputDigits = ""; // テンキーで入力中の数字（0〜3桁）
   let currentSeatId = ""; // 現在照会・操作中の座席番号
   let isRequestInFlight = false; // 多重リクエスト防止フラグ
   let lastFailedAction = null; // 通信エラー時の再試行用クロージャ
 
   // ============================================================
-  // ローカル・インメモリモックDB (B001〜B400 計400席)
+  // ローカル・インメモリモックDB (A001〜A400, B001〜B400 計800席)
   // API未接続時の動作確認・リハーサル用 (同様にメモリ内保持)
   // ============================================================
   const mockDb = new Map();
   function initMockDb() {
     mockDb.clear();
-    for (let i = 1; i <= 400; i++) {
-      const seatId = `B${String(i).padStart(3, "0")}`;
-      mockDb.set(seatId, {
-        seat_id: seatId,
-        status: "UNCHECKED",
-        updated_at: null,
-        updated_by: null,
-      });
+    const blocks = ["A", "B"];
+    for (const block of blocks) {
+      for (let i = 1; i <= 400; i++) {
+        const seatId = `${block}${String(i).padStart(3, "0")}`;
+        mockDb.set(seatId, {
+          seat_id: seatId,
+          status: "UNCHECKED",
+          updated_at: null,
+          updated_by: null,
+        });
+      }
     }
   }
   initMockDb();
@@ -202,7 +205,7 @@
     if (apiBaseUrl) {
       dom.modeBannerText.textContent = `API接続中: ${apiBaseUrl}`;
     } else {
-      dom.modeBannerText.textContent = "ローカル検証モード (対象: B001〜B400)";
+      dom.modeBannerText.textContent = "ローカル検証モード (対象: A001〜A400, B001〜B400)";
     }
   }
 

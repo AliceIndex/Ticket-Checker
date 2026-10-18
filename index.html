@@ -64,7 +64,7 @@
 
     <!-- モード表示バー（モック動作時やAPI設定変更用） -->
     <div id="mode-banner" class="mode-banner" hidden>
-      <span id="mode-banner-text">ローカル検証モード (対象: B001〜B400)</span>
+      <span id="mode-banner-text">ローカル検証モード (対象: A001〜A400, B001〜B400)</span>
       <button type="button" id="open-config-btn" class="mode-config-btn">API設定</button>
     </div>
 
@@ -73,16 +73,15 @@
       <!-- 座席番号入力カード（オンスクリーンキーボード） -->
       <section id="keyboard-section" class="card input-section" aria-label="座席番号入力">
         <div class="input-header">
-          <span class="section-label">座席番号 (対象: B001〜B400)</span>
+          <span class="section-label">座席番号 (対象: A001〜A400, B001〜B400)</span>
         </div>
 
         <!-- ブロック選択ボタン（頭文字アルファベット入力のみ） -->
         <div class="block-selector" role="group" aria-label="ブロック文字選択">
           <span class="block-hint">ブロック選択:</span>
-          <button type="button" class="block-btn" data-prefix="A">A</button>
-          <button type="button" class="block-btn is-active" data-prefix="B">B</button>
+          <button type="button" class="block-btn is-active" data-prefix="A">A</button>
+          <button type="button" class="block-btn" data-prefix="B">B</button>
           <button type="button" class="block-btn" data-prefix="C">C</button>
-          <button type="button" class="block-btn" data-prefix="D">D</button>
         </div>
 
         <!-- 座席番号表示ボックス（OSキーボード非起動） -->
@@ -94,12 +93,12 @@
             aria-live="polite"
             aria-describedby="seat-format-hint"
           >
-            <span id="seat-prefix-display" class="seat-prefix-part">B</span><span id="seat-digits-display" class="seat-digits-part is-placeholder">___</span>
+            <span id="seat-prefix-display" class="seat-prefix-part">A</span><span id="seat-digits-display" class="seat-digits-part is-placeholder">___</span>
           </div>
         </div>
 
         <p id="seat-format-hint" class="input-hint">
-          3桁の数字を入力すると自動で照会画面に切り替わります（例: <code>B001</code>〜<code>B400</code>）
+          3桁の数字を入力すると自動で照会画面に切り替わります（例: <code>A001</code>〜<code>A400</code>, <code>B001</code>〜<code>B400</code>）
         </p>
 
         <!-- オンスクリーンテンキー（0〜9のみ、バックスペースなし） -->
@@ -137,7 +136,7 @@
         <div id="view-invalid" class="status-view" hidden>
           <div class="status-badge badge-invalid">形式エラー</div>
           <p class="error-title">座席番号の形式が正しくありません</p>
-          <p class="error-desc">英大文字1文字＋数字3文字（例: <strong>B001</strong>）で入力してください。</p>
+          <p class="error-desc">英大文字1文字＋数字3文字（例: <strong>A001</strong> / <strong>B001</strong>）で入力してください。</p>
           <button type="button" class="btn btn-secondary btn-block next-seat-btn">
             次の座席を入力する
           </button>
@@ -229,7 +228,7 @@
     <div class="modal-card">
       <h2 id="config-title" class="modal-title">API接続設定</h2>
       <p class="modal-desc">
-        API Gateway のエンドポイントURLを設定します。空欄またはモック指定時はブラウザ内モックDB（400席）で動作します。
+        API Gateway のエンドポイントURLを設定します。空欄またはモック指定時はブラウザ内モックDB（800席: A001〜A400, B001〜B400）で動作します。
       </p>
       <div class="form-group">
         <label for="api-url-input" class="form-label">API ベースURL</label>
