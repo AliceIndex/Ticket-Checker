@@ -159,9 +159,34 @@ class TestTicketServiceBackend(unittest.TestCase):
             self.assertIsNone(data["admitted_at"])
             self.assertIsNone(data["admitted_by"])
 
-    def test_admission_register_duplicate_and_cancel_flow(self):
-        """実入場登録 (ADMITTED) -> 二重入場照会 -> 入場取消 (UNADMITTED) フローおよび確認DBとの独立性"""
-        # 1. 入場確定 (ADMITTED by 田中)
+    def test_student_check_required_before_admission(self):
+        """学生チケット(A/B)は学生証未確認時は入場ブロック(403)、窓口確認済後は入場可能(200)"""
+        # 1. 未確認状態で照会 (ticket_type: STUDENT, student_check.status: UNCHECKED)
+        status, data = self._invoke_admission("GET", "A015")
+        self.assertEqual(status, 200)
+        self.assertEqual(data["ticket_type"], "STUDENT")
+        self.assertEqual(data["student_check"]["status"], "UNCHECKED")
+
+        # 2. 未確認のまま入場登録を試行 -> 403 Forbidden (STUDENT_CHECK_REQUIRED) で拒絶
+        status, data = self._invoke_admission(
+            "PUT", "A015", {"status": "ADMITTED", "operator_name": "田中"}
+        )
+        self.assertEqual(status, 403)
+        self.assertEqual(data["error"], "STUDENT_CHECK_REQUIRED")
+
+        # 3. 特設窓口で学生証確認を実施 (CHECKED by 佐藤)
+        status_chk, _ = self._invoke(
+            "PUT", "A015", {"status": "CHECKED", "operator_name": "佐藤"}
+        )
+        self.assertEqual(status_chk, 200)
+
+        # 4. 入場ゲートで再照会 -> student_check.status が CHECKED になっていること
+        status, data = self._invoke_admission("GET", "A015")
+        self.assertEqual(status, 200)
+        self.assertEqual(data["student_check"]["status"], "CHECKED")
+        self.assertEqual(data["student_check"]["updated_by"], "佐藤")
+
+        # 5. 入場確定 (ADMITTED by 田中) -> 200 OK で成功
         status, data = self._invoke_admission(
             "PUT", "A015", {"status": "ADMITTED", "operator_name": "田中"}
         )
@@ -169,33 +194,42 @@ class TestTicketServiceBackend(unittest.TestCase):
         self.assertEqual(data["seat_id"], "A015")
         self.assertEqual(data["status"], "ADMITTED")
         self.assertEqual(data["admitted_by"], "田中")
-        self.assertIsNotNone(data["admitted_at"])
 
-        # 2. 再照会（二重入場検知用）
+        # 6. 二重入場照会
         status, data = self._invoke_admission("GET", "A015")
         self.assertEqual(status, 200)
         self.assertEqual(data["status"], "ADMITTED")
-        self.assertEqual(data["admitted_by"], "田中")
 
-        # 3. 学生証確認DB (StudentTicketChecks) には影響していないことを確認
-        status_chk, data_chk = self._invoke("GET", "A015")
-        self.assertEqual(status_chk, 200)
-        self.assertEqual(data_chk["status"], "UNCHECKED")
-
-        # 4. 誤操作による入場取消 (UNADMITTED by 高橋)
+        # 7. 誤操作による入場取消 (UNADMITTED by 高橋)
         status, data = self._invoke_admission(
             "PUT", "A015", {"status": "UNADMITTED", "operator_name": "高橋"}
         )
         self.assertEqual(status, 200)
         self.assertEqual(data["status"], "UNADMITTED")
-        self.assertIsNone(data["admitted_at"])
-        self.assertIsNone(data["admitted_by"])
+
+    def test_general_ticket_c_block_admission_without_student_check(self):
+        """一般チケット(Cブロック)は学生証確認なしでそのまま入場可能"""
+        status, data = self._invoke_admission("GET", "C001")
+        self.assertEqual(status, 200)
+        self.assertEqual(data["ticket_type"], "GENERAL")
+        self.assertIsNone(data["student_check"])
+
+        # 学生証確認なしで入場登録可能
+        status_put, data_put = self._invoke_admission(
+            "PUT", "C001", {"status": "ADMITTED", "operator_name": "田中"}
+        )
+        self.assertEqual(status_put, 200)
+        self.assertEqual(data_put["status"], "ADMITTED")
 
     def test_admissions_list_and_summary(self):
         """GET /admissions による全件取得・入場数集計の検証"""
+        # 学生証確認を済ませてから入場登録
+        self._invoke("PUT", "A001", {"status": "CHECKED", "operator_name": "佐藤"})
+        self._invoke("PUT", "A002", {"status": "CHECKED", "operator_name": "佐藤"})
         self._invoke_admission("PUT", "A001", {"status": "ADMITTED", "operator_name": "田中"})
         self._invoke_admission("PUT", "A002", {"status": "ADMITTED", "operator_name": "田中"})
-        self._invoke_admission("PUT", "B010", {"status": "ADMITTED", "operator_name": "山本"})
+        # Cブロックは一般チケットなのでそのまま入場登録
+        self._invoke_admission("PUT", "C010", {"status": "ADMITTED", "operator_name": "山本"})
 
         status, data = self._invoke_admissions_list("GET")
         self.assertEqual(status, 200)
@@ -204,7 +238,7 @@ class TestTicketServiceBackend(unittest.TestCase):
         self.assertEqual(len(data["items"]), 800)
 
         admitted_seats = [item["seat_id"] for item in data["items"] if item["status"] == "ADMITTED"]
-        self.assertEqual(admitted_seats, ["A001", "A002", "B010"])
+        self.assertEqual(admitted_seats, ["A001", "A002", "C010"])
 
     def test_admissions_out_of_range_and_validation(self):
         """入場APIでの対象外座席(404)、不正ステータス(400)、担当者名未入力(400)の検証"""

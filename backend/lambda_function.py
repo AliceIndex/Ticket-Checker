@@ -205,10 +205,12 @@ def handle_put_ticket(seat_id: str, raw_body: str | None, table=None) -> dict:
     )
 
 
-def handle_get_admission(seat_id: str, admissions_table=None) -> dict:
-    """GET /admissions/{seat_id}: 座席の入場ステータスを取得する。"""
+def handle_get_admission(seat_id: str, table=None, admissions_table=None) -> dict:
+    """GET /admissions/{seat_id}: 座席の入場ステータスを取得する。学生チケットの場合は学生証確認状況も連動取得。"""
     if admissions_table is None:
         admissions_table = get_admissions_table()
+    if table is None:
+        table = get_table()
 
     try:
         res = admissions_table.get_item(Key={"seat_id": seat_id})
@@ -233,6 +235,33 @@ def handle_get_admission(seat_id: str, admissions_table=None) -> dict:
             },
         )
 
+    is_student = seat_id.startswith(("A", "B"))
+    student_check = None
+
+    if is_student:
+        try:
+            chk_res = table.get_item(Key={"seat_id": seat_id})
+            chk_item = chk_res.get("Item")
+            if chk_item:
+                student_check = {
+                    "status": chk_item.get("status", "UNCHECKED"),
+                    "updated_at": chk_item.get("updated_at"),
+                    "updated_by": chk_item.get("updated_by"),
+                }
+            else:
+                student_check = {
+                    "status": "UNCHECKED",
+                    "updated_at": None,
+                    "updated_by": None,
+                }
+        except ClientError:
+            # 学生証確認DB照会失敗時も未確認扱いとして安全側に倒す
+            student_check = {
+                "status": "UNCHECKED",
+                "updated_at": None,
+                "updated_by": None,
+            }
+
     return build_response(
         200,
         {
@@ -240,12 +269,19 @@ def handle_get_admission(seat_id: str, admissions_table=None) -> dict:
             "status": item.get("status", "UNADMITTED"),
             "admitted_at": item.get("admitted_at"),
             "admitted_by": item.get("admitted_by"),
+            "ticket_type": "STUDENT" if is_student else "GENERAL",
+            "student_check": student_check,
         },
     )
 
 
-def handle_put_admission(seat_id: str, raw_body: str | None, admissions_table=None) -> dict:
-    """PUT /admissions/{seat_id}: 座席の入場ステータスを更新（入場確定 / 取消）する。"""
+def handle_put_admission(
+    seat_id: str,
+    raw_body: str | None,
+    table=None,
+    admissions_table=None,
+) -> dict:
+    """PUT /admissions/{seat_id}: 座席の入場ステータスを更新（入場確定 / 取消）する。学生チケット未確認時は403でブロック。"""
     if admissions_table is None:
         admissions_table = get_admissions_table()
 
@@ -294,6 +330,32 @@ def handle_put_admission(seat_id: str, raw_body: str | None, admissions_table=No
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     if new_status == "ADMITTED":
+        # 学生チケット (A/Bブロック) の場合、学生証確認DB (StudentTicketChecks) で CHECKED であることを検証
+        if seat_id.startswith(("A", "B")):
+            if table is None:
+                table = get_table()
+            try:
+                chk_res = table.get_item(Key={"seat_id": seat_id})
+                chk_item = chk_res.get("Item")
+                if not chk_item or chk_item.get("status") != "CHECKED":
+                    return build_response(
+                        403,
+                        {
+                            "error": "STUDENT_CHECK_REQUIRED",
+                            "message": f"座席番号 {seat_id} は学生証の確認が完了していないため入場登録できません。特設窓口へご案内ください。",
+                            "seat_id": seat_id,
+                        },
+                    )
+            except ClientError as e:
+                return build_response(
+                    500,
+                    {
+                        "error": "DATABASE_ERROR",
+                        "message": "学生証確認データベース照会中にエラーが発生しました。",
+                        "detail": str(e),
+                    },
+                )
+
         admitted_at_val = now_iso
         admitted_by_val = operator_name
     else:
@@ -501,9 +563,11 @@ def lambda_handler(event: dict, context=None, table=None, admissions_table=None)
 
     if is_admissions_route:
         if http_method == "GET":
-            return handle_get_admission(seat_id, admissions_table=admissions_table)
+            return handle_get_admission(seat_id, table=table, admissions_table=admissions_table)
         elif http_method == "PUT":
-            return handle_put_admission(seat_id, event.get("body"), admissions_table=admissions_table)
+            return handle_put_admission(
+                seat_id, event.get("body"), table=table, admissions_table=admissions_table
+            )
         else:
             return build_response(
                 405,

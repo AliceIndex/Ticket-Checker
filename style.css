@@ -1426,4 +1426,89 @@ button, input {
   color: var(--text-muted);
 }
 
+/* ========================================================
+   学生証未確認ブロック警告 & チケット種別バッジ
+   ======================================================== */
+.alert-block-banner {
+  background: #fef2f2;
+  border: 2.5px solid #dc2626;
+  text-align: left;
+  flex-direction: row;
+  align-items: flex-start;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.15);
+}
+
+.block-alert-title {
+  display: block;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #991b1b;
+  margin-bottom: 6px;
+}
+
+.block-alert-desc {
+  font-size: 0.88rem;
+  color: #7f1d1d;
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+
+.staff-action-box {
+  background: #ffffff;
+  border: 1.5px solid #f87171;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #b91c1c;
+}
+
+.badge-cluster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.badge-ticket-type {
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.badge-ticket-student {
+  background: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #c4b5fd;
+}
+
+.badge-ticket-general {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+}
+
+.verified-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #15803d;
+  width: 100%;
+}
+
+.verified-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  font-weight: 900;
+}
+
 

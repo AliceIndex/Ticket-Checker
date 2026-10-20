@@ -34,8 +34,11 @@
   // ローカル・インメモリモックDB (A001〜A100, B001〜B310, C001〜C390 計800席)
   // ============================================================
   const mockAdmissionsDb = new Map();
+  const mockChecksDb = new Map();
+
   function initMockDb() {
     mockAdmissionsDb.clear();
+    mockChecksDb.clear();
     const blockCounts = { A: 100, B: 310, C: 390 };
     for (const [block, maxNum] of Object.entries(blockCounts)) {
       for (let i = 1; i <= maxNum; i++) {
@@ -46,6 +49,18 @@
           admitted_at: null,
           admitted_by: null,
         });
+
+        // 学生チケット（A/B）のみ学生証確認モックデータを保持
+        if (block === "A" || block === "B") {
+          // モック検証用: 奇数番号は確認済み(CHECKED)、偶数番号は未確認(UNCHECKED)として動作シミュレーション
+          const isVerified = (i % 2 === 1);
+          mockChecksDb.set(seatId, {
+            seat_id: seatId,
+            status: isVerified ? "CHECKED" : "UNCHECKED",
+            updated_at: isVerified ? new Date().toISOString() : null,
+            updated_by: isVerified ? "窓口担当" : null,
+          });
+        }
       }
     }
   }
@@ -86,9 +101,18 @@
     viewInvalid: document.getElementById("view-invalid"),
     viewNotFound: document.getElementById("view-not-found"),
     nfSeatId: document.getElementById("nf-seat-id"),
+
+    // 学生証未確認ブロックビュー
+    viewStudentBlocked: document.getElementById("view-student-blocked"),
+    blockedSeatId: document.getElementById("blocked-seat-id"),
+
     viewUnadmitted: document.getElementById("view-unadmitted"),
     unadmittedSeatId: document.getElementById("unadmitted-seat-id"),
+    ticketTypeBadge: document.getElementById("ticket-type-badge"),
+    studentVerifiedBanner: document.getElementById("student-verified-banner"),
+    studentVerifiedText: document.getElementById("student-verified-text"),
     btnAdmit: document.getElementById("btn-admit"),
+
     viewAdmitted: document.getElementById("view-admitted"),
     admittedBadge: document.getElementById("admitted-badge"),
     admittedSeatId: document.getElementById("admitted-seat-id"),
@@ -157,13 +181,14 @@
       loading: dom.viewLoading,
       invalid: dom.viewInvalid,
       notFound: dom.viewNotFound,
+      studentBlocked: dom.viewStudentBlocked,
       unadmitted: dom.viewUnadmitted,
       admitted: dom.viewAdmitted,
       networkError: dom.viewNetworkError,
     };
 
     Object.entries(views).forEach(([key, el]) => {
-      el.hidden = key !== viewName;
+      if (el) el.hidden = key !== viewName;
     });
 
     dom.statusSection.className = `card status-section ${sectionStateClass}`;
@@ -214,7 +239,11 @@
         notFoundErr.status = 404;
         throw notFoundErr;
       }
-      return { ...mockAdmissionsDb.get(seatId) };
+      const item = { ...mockAdmissionsDb.get(seatId) };
+      const isStudent = seatId.startsWith("A") || seatId.startsWith("B");
+      item.ticket_type = isStudent ? "STUDENT" : "GENERAL";
+      item.student_check = isStudent ? (mockChecksDb.get(seatId) || { status: "UNCHECKED" }) : null;
+      return item;
     }
 
     const res = await fetchWithTimeoutAndRetry(`${apiBaseUrl}/admissions/${encodeURIComponent(seatId)}`, {
@@ -245,6 +274,19 @@
         notFoundErr.status = 404;
         throw notFoundErr;
       }
+
+      // モック検証: A/Bブロックかつ未確認の場合の403ブロックシミュレーション
+      const isStudent = seatId.startsWith("A") || seatId.startsWith("B");
+      if (newStatus === "ADMITTED" && isStudent) {
+        const chk = mockChecksDb.get(seatId);
+        if (!chk || chk.status !== "CHECKED") {
+          const forbiddenErr = new Error("STUDENT_CHECK_REQUIRED");
+          forbiddenErr.status = 403;
+          forbiddenErr.message = "学生証の確認が完了していないため入場登録できません。特設窓口へご案内ください。";
+          throw forbiddenErr;
+        }
+      }
+
       const isAdmitted = newStatus === "ADMITTED";
       const record = {
         seat_id: seatId,
@@ -312,8 +354,32 @@
         switchStatusView("admitted", "state-danger");
       }
     } else {
-      dom.unadmittedSeatId.textContent = data.seat_id;
-      switchStatusView("unadmitted", "state-unchecked");
+      // 未入場 (UNADMITTED) の場合: 学生証確認状態をチェック
+      const isStudent = (data.ticket_type === "STUDENT") || data.seat_id.startsWith("A") || data.seat_id.startsWith("B");
+      const checkStatus = data.student_check ? data.student_check.status : (isStudent ? "UNCHECKED" : "NONE");
+      const isVerified = checkStatus === "CHECKED";
+
+      if (isStudent && !isVerified) {
+        // ⛔ 学生チケットだが未確認のため入場ブロック
+        dom.blockedSeatId.textContent = data.seat_id;
+        switchStatusView("studentBlocked", "state-danger");
+        showToast("⛔ 学生証が未確認です。特設窓口へご案内ください。", "error", 4000);
+      } else {
+        // 🟢 入場許可可能（学生確認済み または 一般チケット）
+        dom.unadmittedSeatId.textContent = data.seat_id;
+        if (isStudent) {
+          dom.ticketTypeBadge.textContent = "学生チケット";
+          dom.ticketTypeBadge.className = "status-badge badge-ticket-student";
+          dom.studentVerifiedBanner.hidden = false;
+          const staff = data.student_check?.updated_by ? ` (確認担当: ${data.student_check.updated_by})` : "";
+          dom.studentVerifiedText.textContent = `特設窓口にて学生証確認済み${staff}`;
+        } else {
+          dom.ticketTypeBadge.textContent = "一般チケット (学生確認不要)";
+          dom.ticketTypeBadge.className = "status-badge badge-ticket-general";
+          dom.studentVerifiedBanner.hidden = true;
+        }
+        switchStatusView("unadmitted", "state-unchecked");
+      }
     }
   }
 
@@ -387,6 +453,11 @@
       if (err && err.status === 404) {
         dom.nfSeatId.textContent = seatId;
         switchStatusView("notFound", "state-danger");
+      } else if (err && err.status === 403) {
+        // ⛔ 学生証未確認ブロックエラー
+        dom.blockedSeatId.textContent = seatId;
+        switchStatusView("studentBlocked", "state-danger");
+        showToast("⛔ 学生証の確認が済んでいないため入場登録できません", "error", 4500);
       } else {
         dom.netErrorTitle.textContent = `${seatId} の更新に失敗しました`;
         dom.netErrorDesc.textContent =
