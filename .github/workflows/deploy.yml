@@ -32,7 +32,7 @@ jobs:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
         run: |
           mkdir -p _site
-          cp index.html style.css app.js _site/
+          cp index.html check.html admission.html data.html style.css app-common.js app-check.js app-admission.js app-data.js app.js _site/
           printf 'window.TICKET_API_BASE_URL = "%s";\n' "${API_BASE_URL}" > _site/config.js
 
       - name: Setup Pages

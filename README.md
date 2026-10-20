@@ -1,6 +1,6 @@
-# 学祭ライブ 学生証確認サービス
+# 学祭ライブ 学生証確認・入場管理サービス
 
-学祭音楽ライブの特設窓口において、スタッフが来場者の学生証を目視確認し、座席番号のステータス照会・確認登録・取消をリアルタイムに行うサーバーレスWebアプリケーションです。
+学祭音楽ライブの特設窓口での「学生証確認」、入場ゲートでの「実入場受付・二重入場防止」、および本部向けの「リアルタイム入場統計ダッシュボード」を提供するサーバーレスWebアプリケーションです。
 
 ---
 
@@ -8,16 +8,26 @@
 
 ```text
 .
-├── index.html               # フロントエンド画面 (GitHub Pages ホスティング対象)
-├── style.css                # モバイルファースト UI スタイルシート
-├── app.js                   # フロントエンド制御 (揮発性担当者保持・API連携・リトライ制御)
-├── MANUAL.md                # 当日スタッフ向け簡易操作マニュアル & トラブルシューティング
+├── index.html               # トップポータル画面 (モード選択ハブ)
+├── check.html               # 学生証確認モード (特設窓口用)
+├── admission.html           # 実入場受付モード (入場ゲート用)
+├── data.html                # 入場データ統計ダッシュボード (本部・統括用)
+├── config.js                # 共通APIベースURL設定
+├── style.css                # 共通モバイルファースト UI スタイルシート
+├── app-common.js            # 共通ユーティリティ (URL解決・リンク同期・通信制御)
+├── app-check.js             # 学生証確認モード制御スクリプト
+├── app-admission.js         # 実入場受付モード制御スクリプト
+├── app-data.js              # データ集計・時間帯推移・リスト制御スクリプト
+├── MANUAL.md                # 当日スタッフ向け操作マニュアル (窓口・ゲート・本部編)
+├── 仕様書.md                # 要件定義・技術仕様書
+├── 変更計画書.md            # サイト構成変更・入場管理機能追加 変更計画書
+├── 実装計画書.md            # 実装計画書
 └── backend/                 # AWS バックエンド & 検証ツール一式
-    ├── template.yaml        # AWS SAM テンプレート (DynamoDB + Lambda + HTTP API Gateway)
-    ├── lambda_function.py   # AWS Lambda ハンドラー (GET / PUT /tickets/{seat_id})
-    ├── seed_data.py         # DynamoDB 初期データ800件(A001〜A400, B001〜B400)投入・リセットスクリプト
-    ├── local_server.py      # ローカルE2E結合テスト用サーバー (AWS不要で動作確認可能)
-    └── test_backend.py      # バックエンド自動テストスイート (Phase 3 検証項目)
+    ├── template.yaml        # AWS SAM テンプレート (DynamoDB 2テーブル + Lambda + HTTP API)
+    ├── lambda_function.py   # AWS Lambda ハンドラー (/tickets/* & /admissions/*)
+    ├── seed_data.py         # DynamoDB 初期データ800件投入・リセットスクリプト (両テーブル対応)
+    ├── local_server.py      # ローカルE2E結合テスト用サーバー (AWS不要で全機能検証可能)
+    └── test_backend.py      # バックエンド自動テストスイート
 ```
 
 ---
@@ -29,13 +39,13 @@
 python backend/test_backend.py
 ```
 
-### 2. ローカル統合サーバーでのブラウザ検証
+### 2. ローカル統合サーバーでのブラウザE2E検証
 AWS環境にデプロイする前でも、ローカルサーバーを起動して本番同等のAPI通信を検証できます。
 ```powershell
 python backend/local_server.py --port 8000
 ```
-ブラウザで `http://localhost:8000/?api=http://localhost:8000` を開くと、ローカルの `lambda_function.py` とインメモリDB（`A001`〜`A400`, `B001`〜`B400` の計800席）に接続された状態で動作します。
-また、`index.html` をそのまま開いた場合（API未設定時）でも、フロントエンド内蔵のモックモード（`A001`〜`A400`, `B001`〜`B400`）で即座にUI操作性を確認できます。
+ブラウザで `http://localhost:8000/?api=http://localhost:8000` を開くと、トップポータルから「実入場受付モード」「学生証確認モード」「入場データダッシュボード」のすべてがローカルの `lambda_function.py` とインメモリDB（`A001`〜`A400`, `B001`〜`B400` 計800席）に接続された状態で動作します。
+また、各HTMLファイルを直接開いた場合（API未設定時）でも、内蔵のローカル検証モードで即座にUI操作性を確認できます。
 
 ---
 
@@ -52,18 +62,15 @@ sam deploy --guided
 
 ### 2. 対象座席（800件: A001〜A400, B001〜B400）の初期データ投入・当日直前リセット
 ```powershell
-# デフォルト (A001〜A400, B001〜B400 の計800席) を UNCHECKED で一括登録
-python backend/seed_data.py --table-name StudentTicketChecks --region ap-northeast-1
+# 確認用テーブル (StudentTicketChecks) と 入場用テーブル (StudentTicketAdmissions) の両方を一括初期化
+python backend/seed_data.py --region ap-northeast-1
 
-# 座席範囲をカスタマイズする場合 (例)
-python backend/seed_data.py --ranges A:1-400 B:1-400 --region ap-northeast-1
+# 片方のテーブルのみ初期化する場合
+python backend/seed_data.py --target checks --region ap-northeast-1
+python backend/seed_data.py --target admissions --region ap-northeast-1
 ```
 
 ### 3. フロントエンドの API URL 設定（GitHub Actions + Secrets 併用）
-1. GitHub リポジトリ（`AliceIndex/Ticket-Checker`）の **Settings > Pages** を開き、**Build and deployment > Source** を **`GitHub Actions`** に変更します。
-2. **Settings > Secrets and variables > Actions** を開き、**New repository secret** をクリックします。
-   * **Name**: `API_BASE_URL`
-   * **Secret**: API Gateway のデフォルトエンドポイントURL（例: `https://xxxx.execute-api.ap-northeast-1.amazonaws.com`）
-3. `main` ブランチへのプッシュ時（または **Actions** タブから `Deploy to GitHub Pages` の **Run workflow** 手動実行時）に、自動で `config.js` に API URL が注入されてデプロイされます。
-   * ※さらに、アクセスURLのクエリパラメータ（`?api=https://...`）や画面下部の「接続設定」からも上書き指定が可能です。
-
+1. GitHub リポジトリの **Settings > Pages** で **Source** を **`GitHub Actions`** に設定します。
+2. **Settings > Secrets and variables > Actions** で `API_BASE_URL` に API Gateway のエンドポイントURLを設定します。
+3. `main` ブランチへのプッシュ時に、自動で `config.js` に API URL が注入されて全ページ（`index.html`, `check.html`, `admission.html`, `data.html`）がデプロイされます。

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>学生証確認モード | 学祭ライブ 学生証確認窓口</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ========================================================
+       T2-2: 担当者名入力モーダル（初回アクセス時強制・揮発性メモリ保持）
+       ======================================================== -->
+  <div id="operator-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <div class="modal-badge">STAFF CHECK-IN</div>
+      <h1 id="modal-title" class="modal-title">確認担当者名の入力</h1>
+      <p class="modal-desc">
+        学祭ライブ 学生証確認モード（特設窓口用）です。<br />
+        操作履歴を記録するため、あなたの氏名（苗字など）を入力してください。
+      </p>
+      <form id="operator-form" novalidate>
+        <div class="form-group">
+          <label for="operator-input" class="form-label">担当者名 <span class="required">*必須</span></label>
+          <input
+            type="text"
+            id="operator-input"
+            class="operator-input"
+            placeholder="例: 佐藤"
+            autocomplete="off"
+            maxlength="20"
+            required
+          />
+          <p id="operator-error" class="field-error" hidden>担当者名を入力してください（空白のみは不可）。</p>
+        </div>
+        <button type="submit" id="operator-submit-btn" class="btn btn-primary btn-block">
+          確認業務を開始する
+        </button>
+      </form>
+      <p class="modal-note">
+        ※端末の引き継ぎミス防止のため、ページを再読み込み・終了すると担当者情報は自動的にリセットされます。
+      </p>
+      <div class="modal-footer-nav">
+        <a href="index.html" data-nav-link class="btn-back-portal">← トップポータルへ戻る</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       T2-1: メイン画面（モバイルファースト・1画面完結レイアウト）
+       ======================================================== -->
+  <div id="app-container" class="app-container is-locked" aria-hidden="true">
+    <!-- ヘッダー部 -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="header-top-row">
+          <a href="index.html" data-nav-link class="header-back-link" aria-label="トップページへ戻る">← トップ</a>
+          <span class="event-tag">特設窓口</span>
+        </div>
+        <h2 class="app-title">学生証確認チェック</h2>
+      </div>
+      <div class="header-right">
+        <div class="operator-pill" title="現在の担当者（リロードでリセット）">
+          <span class="operator-label">担当:</span>
+          <strong id="current-operator-name" class="operator-name">未設定</strong>
+          <button type="button" id="change-operator-btn" class="btn-link" aria-label="担当者を変更">変更</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- モード表示バー（モック動作時やAPI設定変更用） -->
+    <div id="mode-banner" class="mode-banner" hidden>
+      <span id="mode-banner-text">ローカル検証モード (対象: A001〜A400, B001〜B400)</span>
+      <button type="button" id="open-config-btn" class="mode-config-btn">API設定</button>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <main class="app-main">
+      <!-- 座席番号入力カード（オンスクリーンキーボード） -->
+      <section id="keyboard-section" class="card input-section" aria-label="座席番号入力">
+        <div class="input-header">
+          <span class="section-label">座席番号 (対象: A001〜A400, B001〜B400)</span>
+        </div>
+
+        <!-- ブロック選択ボタン（頭文字アルファベット入力のみ） -->
+        <div class="block-selector" role="group" aria-label="ブロック文字選択">
+          <span class="block-hint">ブロック選択:</span>
+          <button type="button" class="block-btn is-active" data-prefix="A">A</button>
+          <button type="button" class="block-btn" data-prefix="B">B</button>
+          <button type="button" class="block-btn" data-prefix="C">C</button>
+        </div>
+
+        <!-- 座席番号表示ボックス（OSキーボード非起動） -->
+        <div class="seat-input-wrapper">
+          <div
+            id="seat-input"
+            class="seat-input seat-display-box"
+            role="status"
+            aria-live="polite"
+            aria-describedby="seat-format-hint"
+          >
+            <span id="seat-prefix-display" class="seat-prefix-part">A</span><span id="seat-digits-display" class="seat-digits-part is-placeholder">___</span>
+          </div>
+        </div>
+
+        <p id="seat-format-hint" class="input-hint">
+          3桁の数字を入力すると自動で照会画面に切り替わります（例: <code>A001</code>〜<code>A400</code>, <code>B001</code>〜<code>B400</code>）
+        </p>
+
+        <!-- オンスクリーンテンキー（0〜9のみ、バックスペースなし） -->
+        <div class="numpad-grid" role="group" aria-label="座席番号テンキー">
+          <button type="button" class="numpad-btn" data-digit="1">1</button>
+          <button type="button" class="numpad-btn" data-digit="2">2</button>
+          <button type="button" class="numpad-btn" data-digit="3">3</button>
+          <button type="button" class="numpad-btn" data-digit="4">4</button>
+          <button type="button" class="numpad-btn" data-digit="5">5</button>
+          <button type="button" class="numpad-btn" data-digit="6">6</button>
+          <button type="button" class="numpad-btn" data-digit="7">7</button>
+          <button type="button" class="numpad-btn" data-digit="8">8</button>
+          <button type="button" class="numpad-btn" data-digit="9">9</button>
+          <button type="button" class="numpad-btn numpad-btn-zero" data-digit="0">0</button>
+        </div>
+      </section>
+
+      <!-- ステータス表示 & アクションエリア（3桁入力完了時に表示） -->
+      <section id="status-section" class="card status-section state-idle" aria-live="polite" hidden>
+        <!-- 初期待機状態 -->
+        <div id="view-idle" class="status-view" hidden>
+          <div class="idle-icon">🎫</div>
+          <p class="idle-title">座席番号を入力してください</p>
+          <p class="idle-sub">学生証とチケットの座席番号を目視確認し、テンキーで3桁の番号を入力します。</p>
+        </div>
+
+        <!-- 通信中スピナー (T2-5) -->
+        <div id="view-loading" class="status-view" hidden>
+          <div class="spinner" aria-hidden="true"></div>
+          <p id="loading-text" class="loading-title">照会中...</p>
+          <p class="loading-sub">通信完了までそのままお待ちください</p>
+        </div>
+
+        <!-- フォーマット不正エラー -->
+        <div id="view-invalid" class="status-view" hidden>
+          <div class="status-badge badge-invalid">形式エラー</div>
+          <p class="error-title">座席番号の形式が正しくありません</p>
+          <p class="error-desc">英大文字1文字＋数字3文字（例: <strong>A001</strong> / <strong>B001</strong>）で入力してください。</p>
+          <button type="button" class="btn btn-secondary btn-block next-seat-btn">
+            次の座席を入力する
+          </button>
+        </div>
+
+        <!-- 404 対象外座席警告 (T2-4) -->
+        <div id="view-not-found" class="status-view" hidden>
+          <div class="status-badge badge-danger">対象外</div>
+          <div class="seat-display" id="nf-seat-id">Z999</div>
+          <div class="alert-banner alert-danger">
+            <strong>対象外の座席番号です</strong>
+            <p>この座席番号は学生チケット対象枠に登録されていません。券面を再度ご確認ください。</p>
+          </div>
+          <button type="button" class="btn btn-secondary btn-block next-seat-btn">
+            次の座席を入力する
+          </button>
+        </div>
+
+        <!-- UNCHECKED: 未確認状態 (T2-4) -->
+        <div id="view-unchecked" class="status-view" hidden>
+          <div class="status-header-row">
+            <span class="status-badge badge-unchecked">未確認 (UNCHECKED)</span>
+            <span class="seat-display" id="unchecked-seat-id">B001</span>
+          </div>
+          <p class="unchecked-guide">学生証の本人確認が完了したら、下のボタンを押してください。</p>
+          <div class="unchecked-actions">
+            <button type="button" id="btn-check-in" class="btn btn-success btn-xl btn-block">
+              ✓ 確認済みにする
+            </button>
+            <button type="button" class="btn btn-secondary btn-block next-seat-btn">
+              次の座席を入力する
+            </button>
+          </div>
+          <p id="unchecked-history" class="meta-info" hidden></p>
+        </div>
+
+        <!-- CHECKED: 確認済み状態・二重登録防止警告 (T2-4) -->
+        <div id="view-checked" class="status-view" hidden>
+          <div class="status-header-row">
+            <span class="status-badge badge-checked">確認済み (CHECKED)</span>
+            <span class="seat-display" id="checked-seat-id">B001</span>
+          </div>
+          <div class="alert-banner alert-warning" role="alert">
+            <div class="alert-icon">⚠️</div>
+            <div class="alert-content">
+              <strong>この番号は既に確認済みです！</strong>
+              <p id="checked-meta" class="checked-meta">最終更新: -- (担当: --)</p>
+            </div>
+          </div>
+          <div class="checked-actions">
+            <button type="button" class="btn btn-primary btn-block next-seat-btn">
+              次の座席を入力する
+            </button>
+            <button type="button" id="btn-undo-check" class="btn btn-outline-danger btn-block">
+              誤操作のため「未確認」に戻す（取消）
+            </button>
+          </div>
+        </div>
+
+        <!-- 通信エラー・タイムアウト表示 + 再試行ボタン (T2-5) -->
+        <div id="view-network-error" class="status-view" hidden>
+          <div class="status-badge badge-danger">通信エラー</div>
+          <p id="net-error-title" class="error-title">サーバーとの通信に失敗しました</p>
+          <p id="net-error-desc" class="error-desc">
+            電波状況が不安定か、タイムアウトが発生しました。下の「再試行」を押してください。
+          </p>
+          <div class="error-actions">
+            <button type="button" id="btn-retry" class="btn btn-primary btn-block">
+              🔄 再試行する
+            </button>
+            <button type="button" class="btn btn-secondary btn-block next-seat-btn">
+              次の座席を入力する
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- フッター -->
+    <footer class="app-footer">
+      <a href="index.html" data-nav-link class="footer-link">トップポータル</a>
+      <span class="footer-sep">|</span>
+      <button type="button" id="footer-config-btn" class="footer-link">接続設定 / 動作モード確認</button>
+    </footer>
+  </div>
+
+  <!-- ========================================================
+       APIエンドポイント設定モーダル（本番URL切替・モック切替用）
+       ======================================================== -->
+  <div id="config-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="config-title" hidden>
+    <div class="modal-card">
+      <h2 id="config-title" class="modal-title">API接続設定</h2>
+      <p class="modal-desc">
+        API Gateway のエンドポイントURLを設定します。空欄またはモック指定時はブラウザ内モックDB（800席: A001〜A400, B001〜B400）で動作します。
+      </p>
+      <div class="form-group">
+        <label for="api-url-input" class="form-label">API ベースURL</label>
+        <input
+          type="url"
+          id="api-url-input"
+          class="operator-input"
+          placeholder="https://xxxx.execute-api.ap-northeast-1.amazonaws.com"
+        />
+      </div>
+      <div class="config-actions">
+        <button type="button" id="save-config-btn" class="btn btn-primary btn-block">設定を適用</button>
+        <button type="button" id="close-config-btn" class="btn btn-secondary btn-block">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       トースト通知コンテナ (T2-1 / T2-5)
+       ======================================================== -->
+  <div id="toast-container" class="toast-container" aria-live="assertive" aria-atomic="true"></div>
+
+  <script src="config.js"></script>
+  <script src="app-common.js"></script>
+  <script src="app-check.js"></script>
+</body>
+</html>
+

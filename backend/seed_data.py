@@ -44,7 +44,7 @@ def parse_range_spec(spec: str) -> list[str]:
 
 
 def generate_initial_records(range_specs: list[str]) -> list[dict]:
-    """指定されたレンジから初期レコード一覧を生成する。"""
+    """指定されたレンジから学生証確認用テーブル (StudentTicketChecks) の初期レコード一覧を生成する。"""
     seats: list[str] = []
     for spec in range_specs:
         seats.extend(parse_range_spec(spec))
@@ -57,6 +57,24 @@ def generate_initial_records(range_specs: list[str]) -> list[dict]:
             "status": "UNCHECKED",
             "updated_at": None,
             "updated_by": None,
+        }
+        for seat_id in unique_seats
+    ]
+
+
+def generate_initial_admission_records(range_specs: list[str]) -> list[dict]:
+    """指定されたレンジから実入場用テーブル (StudentTicketAdmissions) の初期レコード一覧を生成する。"""
+    seats: list[str] = []
+    for spec in range_specs:
+        seats.extend(parse_range_spec(spec))
+
+    unique_seats = list(dict.fromkeys(seats))
+    return [
+        {
+            "seat_id": seat_id,
+            "status": "UNADMITTED",
+            "admitted_at": None,
+            "admitted_by": None,
         }
         for seat_id in unique_seats
     ]
@@ -80,17 +98,28 @@ def seed_dynamodb(table_name: str, region: str | None, records: list[dict]) -> N
             if idx % 100 == 0 or idx == len(records):
                 print(f"  進捗: {idx} / {len(records)} 件完了")
 
-    print("全レコードの初期データ投入（UNCHECKED 初期化）が完了しました。")
+    print(f"テーブル '{table_name}' の初期データ投入が完了しました。")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="StudentTicketChecks テーブルの初期データ投入・リセットスクリプト"
+        description="StudentTicketChecks / StudentTicketAdmissions テーブルの初期データ投入・リセットスクリプト"
     )
     parser.add_argument(
         "--table-name",
         default="StudentTicketChecks",
-        help="対象の DynamoDB テーブル名 (デフォルト: StudentTicketChecks)",
+        help="学生証確認用 DynamoDB テーブル名 (デフォルト: StudentTicketChecks)",
+    )
+    parser.add_argument(
+        "--admissions-table-name",
+        default="StudentTicketAdmissions",
+        help="実入場用 DynamoDB テーブル名 (デフォルト: StudentTicketAdmissions)",
+    )
+    parser.add_argument(
+        "--target",
+        choices=["checks", "admissions", "both"],
+        default="both",
+        help="投入対象テーブル (checks: 確認用のみ, admissions: 入場用のみ, both: 両方 [デフォルト])",
     )
     parser.add_argument(
         "--region",
@@ -115,18 +144,22 @@ def main():
     )
 
     args = parser.parse_args()
-    records = generate_initial_records(args.ranges)
+    check_records = generate_initial_records(args.ranges)
+    admission_records = generate_initial_admission_records(args.ranges)
 
     print(
-        f"生成された対象座席数: {len(records)} 件 "
-        f"(先頭: {records[0]['seat_id']} 〜 末尾: {records[-1]['seat_id']})"
+        f"生成された対象座席数: {len(check_records)} 件 "
+        f"(先頭: {check_records[0]['seat_id']} 〜 末尾: {check_records[-1]['seat_id']})"
     )
 
     if args.export_json:
         out_path = Path(args.export_json)
         out_path.parent.mkdir(parents=True, exist_ok=True)
+        export_payload = (
+            admission_records if args.target == "admissions" else check_records
+        )
         out_path.write_text(
-            json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8"
+            json.dumps(export_payload, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         print(f"初期データ JSON を出力しました: {out_path}")
 
@@ -134,7 +167,15 @@ def main():
         print("[Dry Run] DynamoDB への書き込みはスキップしました。")
         sys.exit(0)
 
-    seed_dynamodb(args.table_name, args.region, records)
+    # --table-name に StudentTicketAdmissions が直接指定された場合の後方互換配慮
+    if args.table_name == args.admissions_table_name and args.target == "both":
+        seed_dynamodb(args.admissions_table_name, args.region, admission_records)
+        return
+
+    if args.target in ("checks", "both"):
+        seed_dynamodb(args.table_name, args.region, check_records)
+    if args.target in ("admissions", "both"):
+        seed_dynamodb(args.admissions_table_name, args.region, admission_records)
 
 
 if __name__ == "__main__":

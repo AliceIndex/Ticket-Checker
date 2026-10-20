@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  学祭ライブ 学生証確認サービス バックエンドインフラ (DynamoDB + Lambda + HTTP API Gateway)
+  学祭ライブ 学生証確認・入場管理サービス バックエンドインフラ (DynamoDB + Lambda + HTTP API Gateway)
 
 Parameters:
   AllowedOrigin:
@@ -11,7 +11,11 @@ Parameters:
   TableName:
     Type: String
     Default: "StudentTicketChecks"
-    Description: "DynamoDB テーブル名"
+    Description: "学生証確認用 DynamoDB テーブル名"
+  AdmissionsTableName:
+    Type: String
+    Default: "StudentTicketAdmissions"
+    Description: "実入場記録用 DynamoDB テーブル名"
 
 Globals:
   Function:
@@ -23,16 +27,32 @@ Globals:
     Environment:
       Variables:
         TABLE_NAME: !Ref TableName
+        ADMISSIONS_TABLE_NAME: !Ref AdmissionsTableName
         ALLOWED_ORIGIN: !Ref AllowedOrigin
 
 Resources:
   # ------------------------------------------------------------
-  # T1-1: DynamoDB テーブル (オンデマンドキャパシティ)
+  # T1-1: 学生証確認用 DynamoDB テーブル (オンデマンドキャパシティ)
   # ------------------------------------------------------------
   StudentTicketChecksTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Ref TableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: seat_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: seat_id
+          KeyType: HASH
+
+  # ------------------------------------------------------------
+  # 新設: 実入場記録用 DynamoDB テーブル (オンデマンドキャパシティ)
+  # ------------------------------------------------------------
+  StudentTicketAdmissionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref AdmissionsTableName
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: seat_id
@@ -71,6 +91,8 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref StudentTicketChecksTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref StudentTicketAdmissionsTable
       Events:
         GetTicket:
           Type: HttpApi
@@ -84,12 +106,33 @@ Resources:
             ApiId: !Ref TicketHttpApi
             Path: /tickets/{seat_id}
             Method: PUT
+        GetAdmission:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TicketHttpApi
+            Path: /admissions/{seat_id}
+            Method: GET
+        PutAdmission:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TicketHttpApi
+            Path: /admissions/{seat_id}
+            Method: PUT
+        ListAdmissions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TicketHttpApi
+            Path: /admissions
+            Method: GET
 
 Outputs:
   ApiEndpoint:
     Description: "HTTP API Gateway エンドポイントURL"
     Value: !Sub "https://${TicketHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
   DynamoDBTableName:
-    Description: "DynamoDB テーブル名"
+    Description: "学生証確認用 DynamoDB テーブル名"
     Value: !Ref StudentTicketChecksTable
+  AdmissionsDynamoDBTableName:
+    Description: "実入場記録用 DynamoDB テーブル名"
+    Value: !Ref StudentTicketAdmissionsTable
 

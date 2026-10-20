@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>入場データ統計ダッシュボード | 学祭ライブ 本部・統括用</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app-container" class="app-container app-container-wide">
+    <!-- ヘッダー部 -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="header-top-row">
+          <a href="index.html" data-nav-link class="header-back-link" aria-label="トップページへ戻る">← トップ</a>
+          <span class="event-tag">本部・統括用</span>
+        </div>
+        <h1 class="app-title">入場データ統計ダッシュボード</h1>
+      </div>
+      <div class="header-right dashboard-header-controls">
+        <span id="last-updated-text" class="last-updated-badge">最終取得: --:--:--</span>
+        <button type="button" id="btn-refresh-now" class="btn btn-primary btn-sm">
+          🔄 今すぐ更新
+        </button>
+      </div>
+    </header>
+
+    <!-- モード表示バー -->
+    <div id="mode-banner" class="mode-banner" hidden>
+      <span id="mode-banner-text">ローカル検証モード</span>
+      <div class="mode-banner-actions">
+        <button type="button" id="btn-mock-sample" class="mode-config-btn" hidden>サンプル入場データ生成</button>
+        <button type="button" id="open-config-btn" class="mode-config-btn">API設定</button>
+      </div>
+    </div>
+
+    <!-- ダッシュボードメイン -->
+    <main class="app-main dashboard-main">
+      <!-- ツールバー（自動更新・CSV出力） -->
+      <section class="card dashboard-toolbar" aria-label="データ更新・出力設定">
+        <div class="toolbar-left">
+          <label class="auto-refresh-toggle">
+            <input type="checkbox" id="auto-refresh-checkbox" checked />
+            <span>自動更新 (30秒間隔)</span>
+          </label>
+          <span id="loading-indicator" class="inline-loading" hidden>通信中...</span>
+        </div>
+        <div class="toolbar-right">
+          <button type="button" id="btn-export-csv" class="btn btn-secondary btn-sm">
+            📥 入場者リストCSV出力
+          </button>
+        </div>
+      </section>
+
+      <!-- エラーバナー -->
+      <div id="data-error-banner" class="alert-banner alert-danger" hidden>
+        <strong>データの取得に失敗しました</strong>
+        <p id="data-error-msg">ネットワーク状態またはAPI接続設定を確認し、「今すぐ更新」を押してください。</p>
+      </div>
+
+      <!-- 1. 入場率サマリー (KPIカード) -->
+      <section aria-label="入場率サマリー" class="kpi-grid">
+        <!-- 全体入場率 -->
+        <div class="card kpi-card kpi-card-total">
+          <div class="kpi-header">
+            <span class="kpi-label">全体入場率 (TOTAL)</span>
+            <span id="kpi-total-remain" class="kpi-sub-badge">未入場: --席</span>
+          </div>
+          <div class="kpi-main-row">
+            <span id="kpi-total-rate" class="kpi-percent">0.0%</span>
+            <span id="kpi-total-count" class="kpi-fraction">0 / 800 席</span>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <div id="kpi-total-bar" class="progress-fill fill-primary" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Aブロック入場率 -->
+        <div class="card kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">Aブロック入場率</span>
+            <span id="kpi-a-remain" class="kpi-sub-badge">未入場: --席</span>
+          </div>
+          <div class="kpi-main-row">
+            <span id="kpi-a-rate" class="kpi-percent">0.0%</span>
+            <span id="kpi-a-count" class="kpi-fraction">0 / 400 席</span>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <div id="kpi-a-bar" class="progress-fill fill-success" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Bブロック入場率 -->
+        <div class="card kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">Bブロック入場率</span>
+            <span id="kpi-b-remain" class="kpi-sub-badge">未入場: --席</span>
+          </div>
+          <div class="kpi-main-row">
+            <span id="kpi-b-rate" class="kpi-percent">0.0%</span>
+            <span id="kpi-b-count" class="kpi-fraction">0 / 400 席</span>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <div id="kpi-b-bar" class="progress-fill fill-accent" style="width: 0%"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. 時間帯別入場数推移 -->
+      <section class="card dashboard-section" aria-labelledby="timeslot-heading">
+        <div class="section-header-bar">
+          <div>
+            <h2 id="timeslot-heading" class="section-title">時間帯別の入場数推移</h2>
+            <p class="section-subtitle">入場時刻を時間帯バケットごとに集計し、混雑ピークを可視化します</p>
+          </div>
+          <div class="bucket-control">
+            <label for="bucket-interval-select" class="control-label">集計単位:</label>
+            <select id="bucket-interval-select" class="select-input">
+              <option value="15" selected>15分刻み</option>
+              <option value="30">30分刻み</option>
+              <option value="60">60分刻み</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="timeslot-empty" class="empty-state">
+          まだ入場記録がありません。入場処理が行われると時間帯別の推移グラフが表示されます。
+        </div>
+
+        <div id="timeslot-container" class="timeslot-wrapper" hidden>
+          <div class="table-responsive">
+            <table class="data-table timeslot-table">
+              <thead>
+                <tr>
+                  <th>時間帯 (JST)</th>
+                  <th class="num-col">Aブロック</th>
+                  <th class="num-col">Bブロック</th>
+                  <th class="num-col">合計人数</th>
+                  <th class="bar-col">推移グラフ</th>
+                </tr>
+              </thead>
+              <tbody id="timeslot-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. ブロック別入場者リスト -->
+      <section class="card dashboard-section" aria-labelledby="attendee-heading">
+        <div class="section-header-bar">
+          <div>
+            <h2 id="attendee-heading" class="section-title">ブロック別 入場者リスト</h2>
+            <p class="section-subtitle">ブロック別の入場状況・入場時刻・受付担当者の一覧検索</p>
+          </div>
+          <span id="filtered-count-badge" class="count-pill">表示: 0 件</span>
+        </div>
+
+        <!-- フィルタ・検索バー -->
+        <div class="filter-bar">
+          <!-- ブロック切り替えタブ -->
+          <div class="tab-group" role="tablist" aria-label="ブロック絞り込み">
+            <button type="button" class="tab-btn is-active" data-block-filter="ALL">すべて</button>
+            <button type="button" class="tab-btn" data-block-filter="A">Aブロック</button>
+            <button type="button" class="tab-btn" data-block-filter="B">Bブロック</button>
+          </div>
+
+          <!-- 状態フィルタ・検索・ソート -->
+          <div class="filter-inputs">
+            <select id="status-filter-select" class="select-input" aria-label="入場状態フィルタ">
+              <option value="ADMITTED" selected>入場済みのみ表示</option>
+              <option value="ALL">全座席を表示 (未入場含む)</option>
+              <option value="UNADMITTED">未入場のみ表示</option>
+            </select>
+
+            <select id="sort-select" class="select-input" aria-label="並び替え">
+              <option value="time_desc" selected>入場時刻 (新しい順)</option>
+              <option value="time_asc">入場時刻 (古い順)</option>
+              <option value="seat_asc">座席番号 (昇順)</option>
+            </select>
+
+            <input
+              type="search"
+              id="search-input"
+              class="search-input"
+              placeholder="席番・担当者名で検索 (例: A01, 田中)"
+              aria-label="座席番号または担当者名で検索"
+            />
+          </div>
+        </div>
+
+        <!-- リストテーブル -->
+        <div class="table-responsive list-table-scroll">
+          <table class="data-table attendee-table">
+            <thead>
+              <tr>
+                <th>座席番号</th>
+                <th>ブロック</th>
+                <th>ステータス</th>
+                <th>入場時刻 (JST)</th>
+                <th>受付担当者</th>
+              </tr>
+            </thead>
+            <tbody id="attendee-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- フッター -->
+    <footer class="app-footer">
+      <a href="index.html" data-nav-link class="footer-link">トップポータル</a>
+      <span class="footer-sep">|</span>
+      <a href="admission.html" data-nav-link class="footer-link">実入場受付モード</a>
+      <span class="footer-sep">|</span>
+      <a href="check.html" data-nav-link class="footer-link">学生証確認モード</a>
+      <span class="footer-sep">|</span>
+      <button type="button" id="footer-config-btn" class="footer-link">API接続設定</button>
+    </footer>
+  </div>
+
+  <!-- APIエンドポイント設定モーダル -->
+  <div id="config-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="config-title" hidden>
+    <div class="modal-card">
+      <h2 id="config-title" class="modal-title">API接続設定</h2>
+      <p class="modal-desc">
+        API Gateway のエンドポイントURLを設定します。空欄時はローカル検証モードで動作します。
+      </p>
+      <div class="form-group">
+        <label for="api-url-input" class="form-label">API ベースURL</label>
+        <input
+          type="url"
+          id="api-url-input"
+          class="operator-input"
+          placeholder="https://xxxx.execute-api.ap-northeast-1.amazonaws.com"
+        />
+      </div>
+      <div class="config-actions">
+        <button type="button" id="save-config-btn" class="btn btn-primary btn-block">設定を適用</button>
+        <button type="button" id="close-config-btn" class="btn btn-secondary btn-block">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- トースト通知コンテナ -->
+  <div id="toast-container" class="toast-container" aria-live="assertive" aria-atomic="true"></div>
+
+  <script src="config.js"></script>
+  <script src="app-common.js"></script>
+  <script src="app-data.js"></script>
+</body>
+</html>
+
