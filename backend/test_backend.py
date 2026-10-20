@@ -27,10 +27,9 @@ from seed_data import generate_initial_admission_records, generate_initial_recor
 
 class TestTicketServiceBackend(unittest.TestCase):
     def setUp(self):
-        # 初期データ 800件 (A001〜A100, B001〜B310, C001〜C390) を両テーブルに投入
-        ranges = ["A:1-100", "B:1-310", "C:1-390"]
-        check_records = generate_initial_records(ranges)
-        admission_records = generate_initial_admission_records(ranges)
+        # 学生証確認DB (A:100, B:310 計410件) / 実入場DB (A:100, B:310, C:390 計800件)
+        check_records = generate_initial_records(["A:1-100", "B:1-310"])
+        admission_records = generate_initial_admission_records(["A:1-100", "B:1-310", "C:1-390"])
         self.table = InMemoryDynamoTable(check_records)
         self.admissions_table = InMemoryDynamoTable(admission_records)
 
@@ -68,15 +67,21 @@ class TestTicketServiceBackend(unittest.TestCase):
         return self._invoke(method, seat_id=None, body=None, raw_path="/admissions")
 
     def test_initial_seed_count(self):
-        """T1-2: 初期データ800件 (A001〜A100, B001〜B310, C001〜C390) が正しくUNCHECKEDで生成されているか"""
-        self.assertEqual(len(self.table.store), 800)
-        for seat_id in ["A001", "A100", "B001", "B310", "C001", "C390"]:
+        """T1-2: 学生証確認初期データ410件 (A001〜A100, B001〜B310) が正しくUNCHECKEDで生成され、Cは対象外(404)か"""
+        self.assertEqual(len(self.table.store), 410)
+        for seat_id in ["A001", "A100", "B001", "B310"]:
             status, data = self._invoke("GET", seat_id)
             self.assertEqual(status, 200)
             self.assertEqual(data["seat_id"], seat_id)
             self.assertEqual(data["status"], "UNCHECKED")
             self.assertIsNone(data["updated_at"])
             self.assertIsNone(data["updated_by"])
+
+        # Cブロックは学生証確認の対象外（404）であることを確認
+        for c_seat in ["C001", "C100", "C390"]:
+            status_c, data_c = self._invoke("GET", c_seat)
+            self.assertEqual(status_c, 404)
+            self.assertEqual(data_c["error"], "SEAT_NOT_FOUND")
 
     def test_check_in_and_recovery_flow(self):
         """T3-1 & T3-2: CHECKED登録 -> 再照会(二重登録確認) -> UNCHECKED取消の一連フロー"""
@@ -110,8 +115,8 @@ class TestTicketServiceBackend(unittest.TestCase):
         self.assertEqual(data["updated_by"], "鈴木")
 
     def test_out_of_range_seat_returns_404(self):
-        """T3-3: 対象外の座席番号 (Z999, A101, B311, C391, D001) のGET/PUTで404が返るか"""
-        for invalid_seat in ["Z999", "A101", "A400", "B311", "B400", "C391", "C400", "D001"]:
+        """T3-3: 対象外の座席番号 (Z999, A101, B311, C001, D001) のGET/PUTで404が返るか"""
+        for invalid_seat in ["Z999", "A101", "A400", "B311", "B400", "C001", "C390", "C400", "D001"]:
             status, data = self._invoke("GET", invalid_seat)
             self.assertEqual(status, 404, f"{invalid_seat} should be 404 on GET")
             self.assertEqual(data["error"], "SEAT_NOT_FOUND")
@@ -220,7 +225,7 @@ class TestTicketServiceBackend(unittest.TestCase):
         self.assertEqual(data["error"], "INVALID_OPERATOR")
 
     def test_seed_action_initializes_both_tables(self):
-        """Lambda の seed アクションで確認DB・入場DBの両方が800件初期化されるか"""
+        """Lambda の seed アクションで確認DB(410件)・入場DB(800件)が初期化されるか"""
         empty_checks = InMemoryDynamoTable([])
         empty_admissions = InMemoryDynamoTable([])
         res = lambda_handler(
@@ -229,7 +234,7 @@ class TestTicketServiceBackend(unittest.TestCase):
             admissions_table=empty_admissions,
         )
         self.assertEqual(res["statusCode"], 200)
-        self.assertEqual(len(empty_checks.store), 800)
+        self.assertEqual(len(empty_checks.store), 410)
         self.assertEqual(len(empty_admissions.store), 800)
 
 

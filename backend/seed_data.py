@@ -43,8 +43,10 @@ def parse_range_spec(spec: str) -> list[str]:
         )
 
 
-def generate_initial_records(range_specs: list[str]) -> list[dict]:
-    """指定されたレンジから学生証確認用テーブル (StudentTicketChecks) の初期レコード一覧を生成する。"""
+def generate_initial_records(range_specs: list[str] | None = None) -> list[dict]:
+    """指定されたレンジから学生証確認用テーブル (StudentTicketChecks: A/Bブロック) の初期レコード一覧を生成する。"""
+    if range_specs is None:
+        range_specs = ["A:1-100", "B:1-310"]
     seats: list[str] = []
     for spec in range_specs:
         seats.extend(parse_range_spec(spec))
@@ -62,8 +64,10 @@ def generate_initial_records(range_specs: list[str]) -> list[dict]:
     ]
 
 
-def generate_initial_admission_records(range_specs: list[str]) -> list[dict]:
-    """指定されたレンジから実入場用テーブル (StudentTicketAdmissions) の初期レコード一覧を生成する。"""
+def generate_initial_admission_records(range_specs: list[str] | None = None) -> list[dict]:
+    """指定されたレンジから実入場用テーブル (StudentTicketAdmissions: A/B/Cブロック) の初期レコード一覧を生成する。"""
+    if range_specs is None:
+        range_specs = ["A:1-100", "B:1-310", "C:1-390"]
     seats: list[str] = []
     for spec in range_specs:
         seats.extend(parse_range_spec(spec))
@@ -129,8 +133,8 @@ def main():
     parser.add_argument(
         "--ranges",
         nargs="+",
-        default=["A:1-100", "B:1-310", "C:1-390"],
-        help="生成する座席範囲のリスト (デフォルト: A:1-100 B:1-310 C:1-390 計800席)",
+        default=None,
+        help="座席範囲を明示指定する場合のリスト (デフォルト: 確認用 A:1-100 B:1-310 / 入場用 A:1-100 B:1-310 C:1-390)",
     )
     parser.add_argument(
         "--dry-run",
@@ -144,12 +148,20 @@ def main():
     )
 
     args = parser.parse_args()
-    check_records = generate_initial_records(args.ranges)
-    admission_records = generate_initial_admission_records(args.ranges)
+    check_records = generate_initial_records(
+        args.ranges if args.ranges is not None else ["A:1-100", "B:1-310"]
+    )
+    admission_records = generate_initial_admission_records(
+        args.ranges if args.ranges is not None else ["A:1-100", "B:1-310", "C:1-390"]
+    )
 
     print(
-        f"生成された対象座席数: {len(check_records)} 件 "
+        f"生成された学生証確認対象座席: {len(check_records)} 件 "
         f"(先頭: {check_records[0]['seat_id']} 〜 末尾: {check_records[-1]['seat_id']})"
+    )
+    print(
+        f"生成された実入場対象座席: {len(admission_records)} 件 "
+        f"(先頭: {admission_records[0]['seat_id']} 〜 末尾: {admission_records[-1]['seat_id']})"
     )
 
     if args.export_json:

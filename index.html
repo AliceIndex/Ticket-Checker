@@ -22,7 +22,7 @@
 
     <!-- モード表示バー -->
     <div id="mode-banner" class="mode-banner">
-      <span id="mode-banner-text">ローカル検証モード (対象: A001〜A100, B001〜B310, C001〜C390)</span>
+      <span id="mode-banner-text">ローカル検証モード (実入場: A/B/C計800席, 学生確認: A/B計410席)</span>
       <button type="button" id="open-config-btn" class="mode-config-btn">API設定</button>
     </div>
 
@@ -37,7 +37,7 @@
         <!-- 1. 実入場受付モード -->
         <a href="admission.html" data-nav-link class="card portal-card portal-card-admission">
           <div class="portal-card-top">
-            <span class="portal-badge badge-gate">GATE ADMISSION ／ 入場ゲート用</span>
+            <span class="portal-badge badge-gate">GATE ADMISSION ／ 入場ゲート用 (A/B/C 800席)</span>
             <span class="portal-arrow" aria-hidden="true">→</span>
           </div>
           <div class="portal-card-body">
@@ -45,7 +45,7 @@
             <div class="portal-text">
               <h2 class="portal-card-title">実入場受付モード</h2>
               <p class="portal-card-desc">
-                開場後の入場ゲート用。座席番号をテンキー入力して入場許可登録・二重入場チェックを行います。
+                開場後の入場ゲート用。全席（A/B/Cブロック 計800席）の座席番号をテンキー入力して入場許可登録・二重入場チェックを行います。
               </p>
             </div>
           </div>
@@ -54,7 +54,7 @@
         <!-- 2. 学生証確認モード -->
         <a href="check.html" data-nav-link class="card portal-card portal-card-check">
           <div class="portal-card-top">
-            <span class="portal-badge badge-check">STUDENT ID CHECK ／ 特設窓口用</span>
+            <span class="portal-badge badge-check">STUDENT ID CHECK ／ 特設窓口用 (A/B 410席)</span>
             <span class="portal-arrow" aria-hidden="true">→</span>
           </div>
           <div class="portal-card-body">
@@ -62,7 +62,7 @@
             <div class="portal-text">
               <h2 class="portal-card-title">学生証確認モード</h2>
               <p class="portal-card-desc">
-                特設窓口用。来場者の学生証とチケットの座席番号を目視確認し、確認済みステータスを登録します。
+                特設窓口用。学生証確認対象のチケット（A/Bブロック 計410席 ※Cブロックは対象外）を目視確認し、確認済みステータスを登録します。
               </p>
             </div>
           </div>
@@ -152,7 +152,7 @@
           portalStatusBadge.textContent = "API接続モード";
           portalStatusBadge.className = "portal-conn-badge is-online";
         } else {
-          modeBannerText.textContent = "ローカル検証モード (対象: A001〜A100, B001〜B310, C001〜C390)";
+          modeBannerText.textContent = "ローカル検証モード (実入場: A/B/C計800席, 学生確認: A/B計410席)";
           portalStatusBadge.textContent = "モック検証モード";
           portalStatusBadge.className = "portal-conn-badge is-mock";
         }

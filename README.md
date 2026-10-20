@@ -44,7 +44,7 @@ AWS環境にデプロイする前でも、ローカルサーバーを起動し�
 ```powershell
 python backend/local_server.py --port 8000
 ```
-ブラウザで `http://localhost:8000/?api=http://localhost:8000` を開くと、トップポータルから「実入場受付モード」「学生証確認モード」「入場データダッシュボード」のすべてがローカルの `lambda_function.py` とインメモリDB（`A001`〜`A400`, `B001`〜`B400` 計800席）に接続された状態で動作します。
+ブラウザで `http://localhost:8000/?api=http://localhost:8000` を開くと、トップポータルから「実入場受付モード（A/B/C計800席）」「学生証確認モード（A/B計410席）」「入場データダッシュボード」のすべてがローカルの `lambda_function.py` とインメモリDBに接続された状態で動作します。
 また、各HTMLファイルを直接開いた場合（API未設定時）でも、内蔵のローカル検証モードで即座にUI操作性を確認できます。
 
 ---
@@ -60,9 +60,9 @@ sam deploy --guided
 * パラメータ `AllowedOrigin` には GitHub Pages のオリジン（例: `https://aliceindex.github.io`、検証中は `*`）を指定します。
 * デプロイ完了時に出力される `ApiEndpoint`（例: `https://xxxx.execute-api.ap-northeast-1.amazonaws.com`）を控えます。
 
-### 2. 対象座席（800件: A001〜A400, B001〜B400）の初期データ投入・当日直前リセット
+### 2. 対象座席の初期データ投入・当日直前リセット
 ```powershell
-# 確認用テーブル (StudentTicketChecks) と 入場用テーブル (StudentTicketAdmissions) の両方を一括初期化
+# 確認用テーブル (A:100, B:310 計410席) と 入場用テーブル (A:100, B:310, C:390 計800席) の両方を一括初期化
 python backend/seed_data.py --region ap-northeast-1
 
 # 片方のテーブルのみ初期化する場合

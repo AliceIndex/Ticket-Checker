@@ -34,12 +34,12 @@
   let lastFailedAction = null; // 通信エラー時の再試行用クロージャ
 
   // ============================================================
-  // ローカル・インメモリモックDB (A001〜A100, B001〜B310, C001〜C390 計800席)
+  // ローカル・インメモリモックDB (学生証確認: A001〜A100, B001〜B310 計410席)
   // ============================================================
   const mockDb = new Map();
   function initMockDb() {
     mockDb.clear();
-    const blockCounts = { A: 100, B: 310, C: 390 };
+    const blockCounts = { A: 100, B: 310 };
     for (const [block, maxNum] of Object.entries(blockCounts)) {
       for (let i = 1; i <= maxNum; i++) {
         const seatId = `${block}${String(i).padStart(3, "0")}`;
@@ -178,7 +178,7 @@
     if (apiBaseUrl) {
       dom.modeBannerText.textContent = `API接続中: ${apiBaseUrl}`;
     } else {
-      dom.modeBannerText.textContent = "ローカル検証モード (対象: A001〜A100, B001〜B310, C001〜C390)";
+      dom.modeBannerText.textContent = "ローカル検証モード (対象: A001〜A100, B001〜B310 計410席)";
     }
     if (window.TicketCommon) {
       window.TicketCommon.setApiBaseUrl(apiBaseUrl);

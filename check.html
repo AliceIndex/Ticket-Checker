@@ -70,7 +70,7 @@
 
     <!-- モード表示バー（モック動作時やAPI設定変更用） -->
     <div id="mode-banner" class="mode-banner" hidden>
-      <span id="mode-banner-text">ローカル検証モード (対象: A001〜A100, B001〜B310, C001〜C390)</span>
+      <span id="mode-banner-text">ローカル検証モード (対象: A001〜A100, B001〜B310 計410席)</span>
       <button type="button" id="open-config-btn" class="mode-config-btn">API設定</button>
     </div>
 
@@ -79,15 +79,14 @@
       <!-- 座席番号入力カード（オンスクリーンキーボード） -->
       <section id="keyboard-section" class="card input-section" aria-label="座席番号入力">
         <div class="input-header">
-          <span class="section-label">座席番号 (対象: A001〜A100, B001〜B310, C001〜C390)</span>
+          <span class="section-label">座席番号 (対象: A001〜A100, B001〜B310)</span>
         </div>
 
-        <!-- ブロック選択ボタン（頭文字アルファベット入力のみ） -->
+        <!-- ブロック選択ボタン（学生証確認はA・Bのみ） -->
         <div class="block-selector" role="group" aria-label="ブロック文字選択">
           <span class="block-hint">ブロック選択:</span>
           <button type="button" class="block-btn is-active" data-prefix="A">A</button>
           <button type="button" class="block-btn" data-prefix="B">B</button>
-          <button type="button" class="block-btn" data-prefix="C">C</button>
         </div>
 
         <!-- 座席番号表示ボックス（OSキーボード非起動） -->
@@ -104,7 +103,7 @@
         </div>
 
         <p id="seat-format-hint" class="input-hint">
-          3桁の数字を入力すると自動で照会画面に切り替わります（対象: <code>A001</code>〜<code>A100</code>, <code>B001</code>〜<code>B310</code>, <code>C001</code>〜<code>C390</code>）
+          3桁の数字を入力すると自動で照会画面に切り替わります（対象: <code>A001</code>〜<code>A100</code>, <code>B001</code>〜<code>B310</code> ※Cブロックは学生確認対象外）
         </p>
 
         <!-- オンスクリーンテンキー（0〜9のみ、バックスペースなし） -->
