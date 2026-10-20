@@ -22,7 +22,7 @@
 
     <!-- モード表示バー -->
     <div id="mode-banner" class="mode-banner">
-      <span id="mode-banner-text">ローカル検証モード (対象: A001〜A400, B001〜B400)</span>
+      <span id="mode-banner-text">ローカル検証モード (対象: A001〜A100, B001〜B310, C001〜C390)</span>
       <button type="button" id="open-config-btn" class="mode-config-btn">API設定</button>
     </div>
 
@@ -152,7 +152,7 @@
           portalStatusBadge.textContent = "API接続モード";
           portalStatusBadge.className = "portal-conn-badge is-online";
         } else {
-          modeBannerText.textContent = "ローカル検証モード (対象: A001〜A400, B001〜B400)";
+          modeBannerText.textContent = "ローカル検証モード (対象: A001〜A100, B001〜B310, C001〜C390)";
           portalStatusBadge.textContent = "モック検証モード";
           portalStatusBadge.className = "portal-conn-badge is-mock";
         }

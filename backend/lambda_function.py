@@ -396,18 +396,21 @@ def handle_list_admissions(admissions_table=None) -> dict:
 
 def lambda_handler(event: dict, context=None, table=None, admissions_table=None) -> dict:
     """API Gateway (HTTP API v2 / REST API v1) からのイベントを処理するメインハンドラー。"""
-    # AWSコンソールの「Test」ボタンから {"action": "seed"} を渡された場合、A001〜A400, B001〜B400 を一括初期化する
+    # AWSコンソールの「Test」ボタンから {"action": "seed"} を渡された場合、
+    # A001〜A100 (100席), B001〜B310 (310席), C001〜C390 (390席) の計800席を一括初期化する
     if isinstance(event, dict) and event.get("action") == "seed":
         seed_target = event.get("target", "both")
-        blocks = event.get("blocks", ["A", "B"])
-        max_num = int(event.get("max_num", 400))
+        block_counts: dict[str, int] = event.get(
+            "block_counts",
+            {"A": 100, "B": 310, "C": 390},
+        )
         seeded_tables = []
 
         if seed_target in ("checks", "both"):
             target_checks = table if table is not None else get_table()
             with target_checks.batch_writer() as batch:
-                for blk in blocks:
-                    for i in range(1, max_num + 1):
+                for blk, max_num in block_counts.items():
+                    for i in range(1, int(max_num) + 1):
                         batch.put_item(
                             Item={
                                 "seat_id": f"{blk}{i:03d}",
@@ -421,8 +424,8 @@ def lambda_handler(event: dict, context=None, table=None, admissions_table=None)
         if seed_target in ("admissions", "both"):
             target_admissions = admissions_table if admissions_table is not None else get_admissions_table()
             with target_admissions.batch_writer() as batch:
-                for blk in blocks:
-                    for i in range(1, max_num + 1):
+                for blk, max_num in block_counts.items():
+                    for i in range(1, int(max_num) + 1):
                         batch.put_item(
                             Item={
                                 "seat_id": f"{blk}{i:03d}",
@@ -433,11 +436,14 @@ def lambda_handler(event: dict, context=None, table=None, admissions_table=None)
                         )
             seeded_tables.append("StudentTicketAdmissions")
 
-        total_count = len(blocks) * max_num
+        total_count = sum(int(n) for n in block_counts.values())
         return build_response(
             200,
             {
-                "message": f"初期データ投入（計{total_count}席 × {len(seeded_tables)}テーブル）が完了しました。",
+                "message": (
+                    f"初期データ投入（A001〜A100, B001〜B310, C001〜C390 計{total_count}席 × "
+                    f"{len(seeded_tables)}テーブル）が完了しました。"
+                ),
                 "count": total_count,
                 "tables": seeded_tables,
             },

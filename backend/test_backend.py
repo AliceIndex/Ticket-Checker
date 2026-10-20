@@ -27,8 +27,8 @@ from seed_data import generate_initial_admission_records, generate_initial_recor
 
 class TestTicketServiceBackend(unittest.TestCase):
     def setUp(self):
-        # 初期データ 800件 (A001〜A400, B001〜B400) を両テーブルに投入
-        ranges = ["A:1-400", "B:1-400"]
+        # 初期データ 800件 (A001〜A100, B001〜B310, C001〜C390) を両テーブルに投入
+        ranges = ["A:1-100", "B:1-310", "C:1-390"]
         check_records = generate_initial_records(ranges)
         admission_records = generate_initial_admission_records(ranges)
         self.table = InMemoryDynamoTable(check_records)
@@ -68,9 +68,9 @@ class TestTicketServiceBackend(unittest.TestCase):
         return self._invoke(method, seat_id=None, body=None, raw_path="/admissions")
 
     def test_initial_seed_count(self):
-        """T1-2: 初期データ800件 (A001〜A400, B001〜B400) が正しくUNCHECKEDで生成されているか"""
+        """T1-2: 初期データ800件 (A001〜A100, B001〜B310, C001〜C390) が正しくUNCHECKEDで生成されているか"""
         self.assertEqual(len(self.table.store), 800)
-        for seat_id in ["A001", "A400", "B001", "B400"]:
+        for seat_id in ["A001", "A100", "B001", "B310", "C001", "C390"]:
             status, data = self._invoke("GET", seat_id)
             self.assertEqual(status, 200)
             self.assertEqual(data["seat_id"], seat_id)
@@ -110,8 +110,8 @@ class TestTicketServiceBackend(unittest.TestCase):
         self.assertEqual(data["updated_by"], "鈴木")
 
     def test_out_of_range_seat_returns_404(self):
-        """T3-3: 対象外の座席番号 (Z999, A401, B401, C001, D001) のGET/PUTで404が返るか"""
-        for invalid_seat in ["Z999", "A401", "A999", "B401", "B999", "C001", "D001"]:
+        """T3-3: 対象外の座席番号 (Z999, A101, B311, C391, D001) のGET/PUTで404が返るか"""
+        for invalid_seat in ["Z999", "A101", "A400", "B311", "B400", "C391", "C400", "D001"]:
             status, data = self._invoke("GET", invalid_seat)
             self.assertEqual(status, 404, f"{invalid_seat} should be 404 on GET")
             self.assertEqual(data["error"], "SEAT_NOT_FOUND")
@@ -146,7 +146,7 @@ class TestTicketServiceBackend(unittest.TestCase):
     def test_admissions_initial_state(self):
         """新設入場テーブル 800件が UNADMITTED で初期化されているか"""
         self.assertEqual(len(self.admissions_table.store), 800)
-        for seat_id in ["A001", "A400", "B001", "B400"]:
+        for seat_id in ["A001", "A100", "B001", "B310", "C001", "C390"]:
             status, data = self._invoke_admission("GET", seat_id)
             self.assertEqual(status, 200)
             self.assertEqual(data["seat_id"], seat_id)

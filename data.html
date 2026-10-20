@@ -84,7 +84,7 @@
           </div>
           <div class="kpi-main-row">
             <span id="kpi-a-rate" class="kpi-percent">0.0%</span>
-            <span id="kpi-a-count" class="kpi-fraction">0 / 400 席</span>
+            <span id="kpi-a-count" class="kpi-fraction">0 / 100 席</span>
           </div>
           <div class="progress-track" aria-hidden="true">
             <div id="kpi-a-bar" class="progress-fill fill-success" style="width: 0%"></div>
@@ -99,10 +99,25 @@
           </div>
           <div class="kpi-main-row">
             <span id="kpi-b-rate" class="kpi-percent">0.0%</span>
-            <span id="kpi-b-count" class="kpi-fraction">0 / 400 席</span>
+            <span id="kpi-b-count" class="kpi-fraction">0 / 310 席</span>
           </div>
           <div class="progress-track" aria-hidden="true">
             <div id="kpi-b-bar" class="progress-fill fill-accent" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Cブロック入場率 -->
+        <div class="card kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">Cブロック入場率</span>
+            <span id="kpi-c-remain" class="kpi-sub-badge">未入場: --席</span>
+          </div>
+          <div class="kpi-main-row">
+            <span id="kpi-c-rate" class="kpi-percent">0.0%</span>
+            <span id="kpi-c-count" class="kpi-fraction">0 / 390 席</span>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <div id="kpi-c-bar" class="progress-fill fill-warning" style="width: 0%"></div>
           </div>
         </div>
       </section>
@@ -136,6 +151,7 @@
                   <th>時間帯 (JST)</th>
                   <th class="num-col">Aブロック</th>
                   <th class="num-col">Bブロック</th>
+                  <th class="num-col">Cブロック</th>
                   <th class="num-col">合計人数</th>
                   <th class="bar-col">推移グラフ</th>
                 </tr>
@@ -160,9 +176,10 @@
         <div class="filter-bar">
           <!-- ブロック切り替えタブ -->
           <div class="tab-group" role="tablist" aria-label="ブロック絞り込み">
-            <button type="button" class="tab-btn is-active" data-block-filter="ALL">すべて</button>
-            <button type="button" class="tab-btn" data-block-filter="A">Aブロック</button>
-            <button type="button" class="tab-btn" data-block-filter="B">Bブロック</button>
+            <button type="button" class="tab-btn is-active" data-block-filter="ALL">すべて (800)</button>
+            <button type="button" class="tab-btn" data-block-filter="A">Aブロック (100)</button>
+            <button type="button" class="tab-btn" data-block-filter="B">Bブロック (310)</button>
+            <button type="button" class="tab-btn" data-block-filter="C">Cブロック (390)</button>
           </div>
 
           <!-- 状態フィルタ・検索・ソート -->

@@ -1160,6 +1160,10 @@ button, input {
   background: #7c3aed;
 }
 
+.fill-warning {
+  background: #ea580c;
+}
+
 /* セクション共通 */
 .dashboard-section {
   display: flex;
@@ -1391,6 +1395,11 @@ button, input {
 .block-tag-B {
   background: #ede9fe;
   color: #5b21b6;
+}
+
+.block-tag-C {
+  background: #ffedd5;
+  color: #9a3412;
 }
 
 .table-badge {

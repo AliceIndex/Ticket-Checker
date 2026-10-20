@@ -129,8 +129,8 @@ def main():
     parser.add_argument(
         "--ranges",
         nargs="+",
-        default=["A:1-400", "B:1-400"],
-        help="生成する座席範囲のリスト (デフォルト: A:1-400 B:1-400 計800席)",
+        default=["A:1-100", "B:1-310", "C:1-390"],
+        help="生成する座席範囲のリスト (デフォルト: A:1-100 B:1-310 C:1-390 計800席)",
     )
     parser.add_argument(
         "--dry-run",

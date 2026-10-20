@@ -28,7 +28,7 @@
   let refreshTimerId = null;
   let isFetching = false;
 
-  // ローカルモックデータ (API未接続時のプレビュー用)
+  // ローカルモックデータ (API未接続時のプレビュー用: A001〜A100, B001〜B310, C001〜C390 計800席)
   let mockItems = [];
   function initMockItems(withSampleAdmissions = true) {
     const items = [];
@@ -37,22 +37,23 @@
     baseTime.setMinutes(0, 0, 0);
     baseTime.setHours(baseTime.getHours() - 1);
 
-    const blocks = ["A", "B"];
-    for (const block of blocks) {
-      for (let i = 1; i <= 400; i++) {
+    const blockCounts = { A: 100, B: 310, C: 390 };
+    for (const [block, maxNum] of Object.entries(blockCounts)) {
+      for (let i = 1; i <= maxNum; i++) {
         const seatId = `${block}${String(i).padStart(3, "0")}`;
         let status = "UNADMITTED";
         let admittedAt = null;
         let admittedBy = null;
 
+        const seedOffset = block === "A" ? 3 : block === "B" ? 11 : 7;
         // サンプル生成時は約35%の座席に入場時刻を分散付与
-        if (withSampleAdmissions && ((i * 7 + (block === "A" ? 3 : 11)) % 20 < 7)) {
+        if (withSampleAdmissions && ((i * 7 + seedOffset) % 20 < 7)) {
           status = "ADMITTED";
-          const offsetMinutes = ((i * 13 + (block === "B" ? 17 : 5)) % 75);
+          const offsetMinutes = ((i * 13 + seedOffset) % 75);
           const offsetSeconds = (i * 29) % 60;
           const dt = new Date(baseTime.getTime() + (offsetMinutes * 60 + offsetSeconds) * 1000);
           admittedAt = dt.toISOString();
-          admittedBy = operators[(i + (block === "A" ? 0 : 2)) % operators.length];
+          admittedBy = operators[(i + seedOffset) % operators.length];
         }
 
         items.push({
@@ -101,6 +102,11 @@
     kpiBCount: document.getElementById("kpi-b-count"),
     kpiBRemain: document.getElementById("kpi-b-remain"),
     kpiBBar: document.getElementById("kpi-b-bar"),
+
+    kpiCRate: document.getElementById("kpi-c-rate"),
+    kpiCCount: document.getElementById("kpi-c-count"),
+    kpiCRemain: document.getElementById("kpi-c-remain"),
+    kpiCBar: document.getElementById("kpi-c-bar"),
 
     bucketIntervalSelect: document.getElementById("bucket-interval-select"),
     timeslotEmpty: document.getElementById("timeslot-empty"),
@@ -220,16 +226,21 @@
     const admittedAll = allItems.filter((x) => x.status === "ADMITTED").length;
 
     const aItems = allItems.filter((x) => x.seat_id.startsWith("A"));
-    const aTotal = aItems.length || 400;
+    const aTotal = aItems.length || 100;
     const aAdmitted = aItems.filter((x) => x.status === "ADMITTED").length;
 
     const bItems = allItems.filter((x) => x.seat_id.startsWith("B"));
-    const bTotal = bItems.length || 400;
+    const bTotal = bItems.length || 310;
     const bAdmitted = bItems.filter((x) => x.status === "ADMITTED").length;
+
+    const cItems = allItems.filter((x) => x.seat_id.startsWith("C"));
+    const cTotal = cItems.length || 390;
+    const cAdmitted = cItems.filter((x) => x.status === "ADMITTED").length;
 
     const totalRate = totalSeats > 0 ? ((admittedAll / totalSeats) * 100).toFixed(1) : "0.0";
     const aRate = aTotal > 0 ? ((aAdmitted / aTotal) * 100).toFixed(1) : "0.0";
     const bRate = bTotal > 0 ? ((bAdmitted / bTotal) * 100).toFixed(1) : "0.0";
+    const cRate = cTotal > 0 ? ((cAdmitted / cTotal) * 100).toFixed(1) : "0.0";
 
     dom.kpiTotalRate.textContent = `${totalRate}%`;
     dom.kpiTotalCount.textContent = `${admittedAll} / ${totalSeats} 席`;
@@ -245,6 +256,11 @@
     dom.kpiBCount.textContent = `${bAdmitted} / ${bTotal} 席`;
     dom.kpiBRemain.textContent = `未入場: ${Math.max(0, bTotal - bAdmitted)}席`;
     dom.kpiBBar.style.width = `${Math.min(100, parseFloat(bRate))}%`;
+
+    dom.kpiCRate.textContent = `${cRate}%`;
+    dom.kpiCCount.textContent = `${cAdmitted} / ${cTotal} 席`;
+    dom.kpiCRemain.textContent = `未入場: ${Math.max(0, cTotal - cAdmitted)}席`;
+    dom.kpiCBar.style.width = `${Math.min(100, parseFloat(cRate))}%`;
   }
 
   // ============================================================
@@ -297,7 +313,7 @@
           label: info.label,
           countA: 0,
           countB: 0,
-          countOther: 0,
+          countC: 0,
           total: 0,
         });
       }
@@ -306,8 +322,8 @@
         bucket.countA += 1;
       } else if (item.seat_id.startsWith("B")) {
         bucket.countB += 1;
-      } else {
-        bucket.countOther += 1;
+      } else if (item.seat_id.startsWith("C")) {
+        bucket.countC += 1;
       }
       bucket.total += 1;
     }
@@ -342,6 +358,10 @@
       tdB.className = "num-col";
       tdB.textContent = `${b.countB} 名`;
 
+      const tdC = document.createElement("td");
+      tdC.className = "num-col";
+      tdC.textContent = `${b.countC} 名`;
+
       const tdTotal = document.createElement("td");
       tdTotal.className = "num-col font-bold";
       tdTotal.textContent = `${b.total} 名`;
@@ -356,7 +376,7 @@
       barTrack.appendChild(barFill);
       tdBar.appendChild(barTrack);
 
-      tr.append(tdLabel, tdA, tdB, tdTotal, tdBar);
+      tr.append(tdLabel, tdA, tdB, tdC, tdTotal, tdBar);
       dom.timeslotTbody.appendChild(tr);
     });
   }

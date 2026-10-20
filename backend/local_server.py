@@ -172,7 +172,7 @@ def main():
     parser.add_argument("--port", type=int, default=8000, help="待受ポート番号 (デフォルト: 8000)")
     args = parser.parse_args()
 
-    ranges = ["A:1-400", "B:1-400"]
+    ranges = ["A:1-100", "B:1-310", "C:1-390"]
     check_records = generate_initial_records(ranges)
     admission_records = generate_initial_admission_records(ranges)
     mock_table = InMemoryDynamoTable(check_records)

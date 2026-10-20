@@ -70,7 +70,7 @@
 
     <!-- モード表示バー -->
     <div id="mode-banner" class="mode-banner" hidden>
-      <span id="mode-banner-text">ローカル検証モード (入場DB: A001〜A400, B001〜B400)</span>
+      <span id="mode-banner-text">ローカル検証モード (入場DB: A001〜A100, B001〜B310, C001〜C390)</span>
       <button type="button" id="open-config-btn" class="mode-config-btn">API設定</button>
     </div>
 
@@ -79,7 +79,7 @@
       <!-- 座席番号入力カード（オンスクリーンキーボード） -->
       <section id="keyboard-section" class="card input-section" aria-label="座席番号入力">
         <div class="input-header">
-          <span class="section-label">入場する座席番号 (対象: A001〜A400, B001〜B400)</span>
+          <span class="section-label">入場する座席番号 (対象: A001〜A100, B001〜B310, C001〜C390)</span>
         </div>
 
         <!-- ブロック選択ボタン -->
@@ -104,7 +104,7 @@
         </div>
 
         <p id="seat-format-hint" class="input-hint">
-          3桁の数字を入力すると自動で入場ステータスを照会します（例: <code>A001</code>〜<code>A400</code>, <code>B001</code>〜<code>B400</code>）
+          3桁の数字を入力すると自動で入場ステータスを照会します（対象: <code>A001</code>〜<code>A100</code>, <code>B001</code>〜<code>B310</code>, <code>C001</code>〜<code>C390</code>）
         </p>
 
         <!-- オンスクリーンテンキー -->
